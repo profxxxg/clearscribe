@@ -81,3 +81,22 @@ def test_deep_backend_missing_gives_helpful_error(noisy_wav, tmp_path):
         with pytest.raises(ImportError, match="deep"):
             run_pipeline(noisy_wav, tmp_path / "out", transcribe=False,
                          enhance_settings=EnhanceSettings(backend="deep"))
+
+
+def test_torchaudio_compat_shim(monkeypatch):
+    """Shim must create torchaudio.backend.common when modern torchaudio lacks it."""
+    import sys
+    import types
+
+    from clearscribe.deep import _ensure_torchaudio_compat
+
+    fake_ta = types.ModuleType("torchaudio")  # modern torchaudio: no .backend
+    for name in list(sys.modules):
+        if name == "torchaudio" or name.startswith("torchaudio."):
+            monkeypatch.delitem(sys.modules, name)
+    monkeypatch.setitem(sys.modules, "torchaudio", fake_ta)
+
+    _ensure_torchaudio_compat()
+    from torchaudio.backend.common import AudioMetaData  # must not raise
+    assert AudioMetaData is not None
+    assert sys.modules["torchaudio"].backend.common.AudioMetaData is AudioMetaData

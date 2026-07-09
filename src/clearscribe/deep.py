@@ -28,6 +28,52 @@ logger = logging.getLogger(__name__)
 
 _MODEL_CACHE: dict = {}
 
+
+def _ensure_torchaudio_compat() -> None:
+    """Make DeepFilterNet importable on modern torchaudio.
+
+    DeepFilterNet 0.5.x does `from torchaudio.backend.common import
+    AudioMetaData`, but torchaudio >= 2.6 removed the `backend` module.
+    We never use torchaudio I/O (ClearScribe feeds DeepFilterNet raw
+    tensors and resamples with scipy), so a minimal stand-in module is
+    enough to satisfy the import.
+    """
+    import importlib
+    import types
+
+    try:
+        import torchaudio
+    except ImportError:
+        return  # handled by the caller's install hint
+    try:
+        importlib.import_module("torchaudio.backend.common")
+        return  # old torchaudio — nothing to do
+    except Exception:
+        pass
+
+    AudioMetaData = getattr(torchaudio, "AudioMetaData", None)
+    if AudioMetaData is None:
+        try:  # some versions keep it in the private module
+            from torchaudio._backend.common import AudioMetaData  # type: ignore
+        except Exception:
+            class AudioMetaData:  # minimal stand-in (df uses it as a type)
+                def __init__(self, sample_rate=0, num_frames=0,
+                             num_channels=0, bits_per_sample=0, encoding=""):
+                    self.sample_rate = sample_rate
+                    self.num_frames = num_frames
+                    self.num_channels = num_channels
+                    self.bits_per_sample = bits_per_sample
+                    self.encoding = encoding
+
+    backend = types.ModuleType("torchaudio.backend")
+    common = types.ModuleType("torchaudio.backend.common")
+    common.AudioMetaData = AudioMetaData
+    backend.common = common
+    sys.modules["torchaudio.backend"] = backend
+    sys.modules["torchaudio.backend.common"] = common
+    torchaudio.backend = backend
+    logger.info("Applied torchaudio>=2.6 compatibility shim for DeepFilterNet")
+
 if sys.version_info >= (3, 12):
     INSTALL_HINT = (
         "The 'deep' backend needs DeepFilterNet, which has no prebuilt wheels "
@@ -51,6 +97,7 @@ else:
 def is_available() -> bool:
     """True if the deep backend's dependencies are importable."""
     try:
+        _ensure_torchaudio_compat()
         import df.enhance  # noqa: F401
         import torch  # noqa: F401
         return True
@@ -61,6 +108,7 @@ def is_available() -> bool:
 def deep_denoise(audio: np.ndarray, sr: int) -> np.ndarray:
     """Denoise with DeepFilterNet3. Handles resampling to/from its 48 kHz."""
     try:
+        _ensure_torchaudio_compat()
         import torch
         from df.enhance import enhance, init_df
     except ImportError as e:

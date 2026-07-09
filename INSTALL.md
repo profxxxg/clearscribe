@@ -197,8 +197,10 @@ pip install torch deepfilternet
 **If your Python is 3.12 or newer**, run ClearScribe in a Python 3.11
 environment instead (both Pythons coexist happily):
 
-1. Install Python 3.11 from
-   [python.org/downloads](https://www.python.org/downloads/) (any 3.11.x)
+1. Install Python 3.11. **Use 3.11.9** — it's the last 3.11 with a Windows
+   installer (newer 3.11.x are source-only security releases):
+   [direct installer download](https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe)
+   · [release page](https://www.python.org/downloads/release/python-3119/)
 2. In the `clearscribe` folder, create and activate a 3.11 venv:
 
    **Windows:**

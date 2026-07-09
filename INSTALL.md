@@ -182,12 +182,44 @@ pip install ".[ui]" --upgrade
 ## Optional: the Deep AI denoise engine
 
 If your recordings have **background voices/chatter** or heavy noise the
-built-in denoiser can't handle, install the DeepFilterNet backend:
+built-in denoiser can't handle, install the DeepFilterNet backend.
+
+> ⚠️ **Requires Python 3.8–3.11.** DeepFilterNet's compiled component has no
+> prebuilt wheels for Python 3.12+ yet — on 3.12 pip tries to compile it and
+> fails with *"Cargo, the Rust package manager, is not installed"*.
+
+**If your Python is 3.8–3.11**, it's just:
 
 ```bash
-pip install torch
-pip install "deepfilternet @ git+https://github.com/Rikorose/DeepFilterNet.git#subdirectory=DeepFilterNet"
+pip install torch deepfilternet
 ```
+
+**If your Python is 3.12 or newer**, run ClearScribe in a Python 3.11
+environment instead (both Pythons coexist happily):
+
+1. Install Python 3.11 from
+   [python.org/downloads](https://www.python.org/downloads/) (any 3.11.x)
+2. In the `clearscribe` folder, create and activate a 3.11 venv:
+
+   **Windows:**
+   ```powershell
+   py -3.11 -m venv .venv311
+   .venv311\Scripts\activate
+   ```
+   **macOS / Linux:**
+   ```bash
+   python3.11 -m venv .venv311
+   source .venv311/bin/activate
+   ```
+3. Install everything in it:
+   ```bash
+   pip install ".[ui]"
+   pip install torch deepfilternet
+   ```
+
+(Alternative for those who want to stay on 3.12: install
+[Rust](https://rustup.rs/) and, on Windows, the Microsoft C++ Build Tools,
+then `pip install deepfilternet` compiles from source.)
 
 Then choose **Deep AI — DeepFilterNet** in the web app's "Denoise engine"
 selector, or add `--backend deep` on the command line. The model (~50 MB)
@@ -211,6 +243,7 @@ difference on background voices is night and day.
 | Port 7860 already in use | Another Gradio app is running — close it, or `GRADIO_SERVER_PORT=7861 clearscribe-ui` |
 | Enhanced audio sounds over-processed | Try the `gentle` preset, or lower the noise-reduction and compressor sliders |
 | Background voices still audible | Spectral denoising can't separate voice from voice — install the Deep AI engine (section above) and select it |
+| `Cargo, the Rust package manager, is not installed` when installing deepfilternet | You're on Python 3.12+ where no prebuilt wheels exist — use a Python 3.11 venv as shown in the Deep AI section above |
 | A constant whine/beep survives (often 1–8 kHz) | Make sure **Auto-remove tonal noises** is ticked (it's on by default); also try setting the Presence EQ slider to 0 so leftover noise there isn't boosted |
 
 Still stuck? [Open an issue](https://github.com/Profxxxg/clearscribe/issues) —

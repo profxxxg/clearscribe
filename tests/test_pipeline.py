@@ -78,6 +78,6 @@ def test_deep_backend_missing_gives_helpful_error(noisy_wav, tmp_path):
         return real_import(name, *a, **k)
 
     with patch("builtins.__import__", side_effect=block_df):
-        with pytest.raises(ImportError, match="deepfilternet @"):
+        with pytest.raises(ImportError, match="deep"):
             run_pipeline(noisy_wav, tmp_path / "out", transcribe=False,
                          enhance_settings=EnhanceSettings(backend="deep"))

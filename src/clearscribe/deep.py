@@ -5,9 +5,13 @@ including *babble* (background voices/chatter) — which classic spectral
 methods fundamentally cannot remove, because background speech occupies the
 same frequencies as the main voice.
 
-Install:
-    pip install torch
-    pip install "deepfilternet @ git+https://github.com/Rikorose/DeepFilterNet.git#subdirectory=DeepFilterNet"
+Install (Python 3.8–3.11):
+    pip install torch deepfilternet
+
+Python 3.12+ note: DeepFilterNet's compiled component (deepfilterlib) has no
+prebuilt wheels beyond Python 3.11, so pip tries to compile it and demands the
+Rust toolchain ("Cargo ... is not installed"). Easiest fix: run ClearScribe in
+a Python 3.11 virtual environment. See INSTALL.md.
 
 The model (~50 MB) downloads automatically on first use and is cached.
 """
@@ -15,6 +19,7 @@ The model (~50 MB) downloads automatically on first use and is cached.
 from __future__ import annotations
 
 import logging
+import sys
 from math import gcd
 
 import numpy as np
@@ -23,13 +28,24 @@ logger = logging.getLogger(__name__)
 
 _MODEL_CACHE: dict = {}
 
-INSTALL_HINT = (
-    "The 'deep' backend needs DeepFilterNet and PyTorch.\n"
-    "Install them with:\n"
-    "  pip install torch\n"
-    '  pip install "deepfilternet @ '
-    'git+https://github.com/Rikorose/DeepFilterNet.git#subdirectory=DeepFilterNet"'
-)
+if sys.version_info >= (3, 12):
+    INSTALL_HINT = (
+        "The 'deep' backend needs DeepFilterNet, which has no prebuilt wheels "
+        f"for your Python ({sys.version_info.major}.{sys.version_info.minor}) — "
+        "pip would try to compile it and ask for the Rust toolchain.\n"
+        "Easiest fix: create a Python 3.11 virtual environment and install "
+        "there:\n"
+        "  py -3.11 -m venv .venv311        (Windows; on macOS/Linux: python3.11 -m venv .venv311)\n"
+        "  .venv311\\Scripts\\activate\n"
+        '  pip install ".[ui]" torch deepfilternet\n'
+        "See INSTALL.md for the full walkthrough."
+    )
+else:
+    INSTALL_HINT = (
+        "The 'deep' backend needs DeepFilterNet and PyTorch.\n"
+        "Install them with:\n"
+        "  pip install torch deepfilternet"
+    )
 
 
 def is_available() -> bool:

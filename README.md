@@ -9,9 +9,10 @@ Feed it a noisy voice recording. Get back a cleaned-up audio file plus transcrip
 Classic spectral denoising **cannot** separate one voice from other voices — background speech lives in the same frequencies as the main speaker, so there is nothing for a filter to grab. That's a mathematical limit, not a tuning problem. For recordings with people talking in the background, enable the **deep** backend (DeepFilterNet, a neural model trained on exactly this "babble" noise):
 
 ```bash
-pip install torch
-pip install "deepfilternet @ git+https://github.com/Rikorose/DeepFilterNet.git#subdirectory=DeepFilterNet"
+pip install torch deepfilternet
 ```
+
+**Heads-up: requires Python 3.8–3.11.** On Python 3.12+ there are no prebuilt wheels yet, so pip will demand the Rust toolchain — the easy fix is running ClearScribe in a Python 3.11 virtual environment ([step-by-step in INSTALL.md](INSTALL.md#optional-the-deep-ai-denoise-engine)).
 
 Then pick **Deep AI** in the web app, or use `--backend deep` on the CLI. The model (~50 MB) downloads once and is cached.
 

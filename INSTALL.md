@@ -48,6 +48,10 @@ python -m venv .venv
 .venv\Scripts\activate
 ```
 
+> ⚠️ **Mind the space** in `venv .venv` — it's the module `venv`, a space, then
+> the folder name `.venv`. Typing `venv.venv` gives
+> `No module named venv.venv`.
+
 > If PowerShell complains about execution policy, run:
 > `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
 > then try activating again — or just use CMD instead.
@@ -175,6 +179,24 @@ pip install ".[ui]" --upgrade
 
 ---
 
+## Optional: the Deep AI denoise engine
+
+If your recordings have **background voices/chatter** or heavy noise the
+built-in denoiser can't handle, install the DeepFilterNet backend:
+
+```bash
+pip install torch
+pip install "deepfilternet @ git+https://github.com/Rikorose/DeepFilterNet.git#subdirectory=DeepFilterNet"
+```
+
+Then choose **Deep AI — DeepFilterNet** in the web app's "Denoise engine"
+selector, or add `--backend deep` on the command line. The model (~50 MB)
+downloads automatically on first use. Note: PyTorch is a large download
+(1 GB+), and processing is slower than the built-in engine — but the quality
+difference on background voices is night and day.
+
+---
+
 ## Troubleshooting
 
 | Problem | Fix |
@@ -188,6 +210,8 @@ pip install ".[ui]" --upgrade
 | Wrong language detected | Set it explicitly: `--language en` (or type it in the UI's language box) |
 | Port 7860 already in use | Another Gradio app is running — close it, or `GRADIO_SERVER_PORT=7861 clearscribe-ui` |
 | Enhanced audio sounds over-processed | Try the `gentle` preset, or lower the noise-reduction and compressor sliders |
+| Background voices still audible | Spectral denoising can't separate voice from voice — install the Deep AI engine (section above) and select it |
+| A constant whine/beep survives (often 1–8 kHz) | Make sure **Auto-remove tonal noises** is ticked (it's on by default); also try setting the Presence EQ slider to 0 so leftover noise there isn't boosted |
 
 Still stuck? [Open an issue](https://github.com/Profxxxg/clearscribe/issues) —
 include your OS, Python version, and the full error message.

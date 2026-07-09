@@ -7,7 +7,7 @@ import logging
 import sys
 
 from clearscribe import __version__
-from clearscribe.enhance import EnhanceSettings
+from clearscribe.enhance import PRESETS, EnhanceSettings
 from clearscribe.pipeline import run_pipeline
 
 
@@ -30,13 +30,17 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Skip enhancement, transcribe the original audio")
     p.add_argument("--enhance-only", action="store_true",
                    help="Only enhance the audio, skip transcription")
-    p.add_argument("--strength", type=float, default=0.85,
+    p.add_argument("--preset", default="podcast", choices=list(PRESETS),
+                   help="Enhancement preset (default: podcast)")
+    p.add_argument("--dehum", type=float, default=None, metavar="HZ",
+                   help="Remove mains hum: 50 (EU) or 60 (US). Default: off")
+    p.add_argument("--strength", type=float, default=None,
                    help="Noise reduction strength 0-1 (default: 0.85)")
     p.add_argument("--stationary", action="store_true",
                    help="Use stationary noise reduction (constant hum/hiss)")
-    p.add_argument("--target-lufs", type=float, default=-16.0,
+    p.add_argument("--target-lufs", type=float, default=None,
                    help="Loudness target in LUFS (default: -16)")
-    p.add_argument("--highpass", type=float, default=80.0,
+    p.add_argument("--highpass", type=float, default=None,
                    help="High-pass cutoff in Hz, 0 to disable (default: 80)")
     p.add_argument("-v", "--verbose", action="store_true", help="Verbose logging")
     p.add_argument("--version", action="version", version=f"clearscribe {__version__}")
@@ -55,12 +59,18 @@ def main(argv: list[str] | None = None) -> int:
               file=sys.stderr)
         return 2
 
-    settings = EnhanceSettings(
-        highpass_hz=args.highpass,
-        noise_reduction_strength=args.strength,
-        stationary_noise=args.stationary,
-        target_lufs=args.target_lufs,
-    )
+    import dataclasses
+    settings = dataclasses.replace(PRESETS[args.preset])
+    if args.highpass is not None:
+        settings.highpass_hz = args.highpass
+    if args.strength is not None:
+        settings.noise_reduction_strength = args.strength
+    if args.stationary:
+        settings.stationary_noise = True
+    if args.target_lufs is not None:
+        settings.target_lufs = args.target_lufs
+    if args.dehum is not None:
+        settings.dehum_hz = args.dehum
 
     try:
         outputs = run_pipeline(

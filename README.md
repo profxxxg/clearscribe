@@ -4,12 +4,24 @@
 
 Feed it a noisy voice recording. Get back a cleaned-up audio file plus transcripts in TXT, SRT, VTT, and JSON. No API keys, no cloud, no cost.
 
+## Background voices? Use the Deep AI engine
+
+Classic spectral denoising **cannot** separate one voice from other voices — background speech lives in the same frequencies as the main speaker, so there is nothing for a filter to grab. That's a mathematical limit, not a tuning problem. For recordings with people talking in the background, enable the **deep** backend (DeepFilterNet, a neural model trained on exactly this "babble" noise):
+
+```bash
+pip install torch
+pip install "deepfilternet @ git+https://github.com/Rikorose/DeepFilterNet.git#subdirectory=DeepFilterNet"
+```
+
+Then pick **Deep AI** in the web app, or use `--backend deep` on the CLI. The model (~50 MB) downloads once and is cached.
+
 ## What it does
 
 1. **Enhances your audio with a full broadcast chain**
    - High-pass filter removes low-frequency rumble and handling noise
    - Mains **de-hum** notches out 50/60 Hz hum and its harmonics
-   - Spectral-gating **noise reduction** ([noisereduce](https://github.com/timsainb/noisereduce)) cleans hiss and background noise
+   - **Auto-notch** detects and removes constant tonal noises — electronics whines, beeps, monitor coil whine (typically 1–8 kHz)
+   - Two-pass spectral **noise reduction** ([noisereduce](https://github.com/timsainb/noisereduce)) cleans hiss and background noise — or switch to the optional **Deep AI engine** ([DeepFilterNet](https://github.com/Rikorose/DeepFilterNet)), which is dramatically better at background voices and chatter
    - **Noise gate** pushes pauses into clean silence
    - **Compressor** (soft-knee) evens out loud and quiet speech — the core of the "podcast sound"
    - **De-esser** tames harsh S/T sibilance
@@ -119,7 +131,6 @@ Transcription then runs on the **enhanced** audio, which measurably helps Whispe
 Issues and PRs welcome! Ideas on the roadmap:
 
 - [ ] Batch processing of folders
-- [ ] Optional DeepFilterNet / deep-learning denoiser backend
 - [ ] Speaker diarisation
 - [ ] Word-level timestamps
 - [ ] Reference-track loudness matching

@@ -72,3 +72,27 @@ def test_envelope_tracks_level_changes():
     env = dsp.envelope(audio, SR)
     assert len(env) == len(audio)
     assert env[int(1.5 * SR)] > env[SR // 2] * 4
+
+
+def test_find_tonal_noises_detects_3500hz_whine():
+    voice = tone(200, 5.0, 0.3) * (np.sin(2*np.pi*1.0*np.linspace(0,5,5*SR)) > 0)
+    whine = tone(3500, 5.0, 0.04)  # quiet constant electronics whine
+    noise = (RNG.normal(0, 0.01, 5 * SR)).astype(np.float32)
+    found = dsp.find_tonal_noises(voice + whine + noise, SR)
+    assert any(abs(f - 3500) < 30 for f in found), f"missed whine, found {found}"
+
+
+def test_find_tonal_noises_clean_audio_finds_little():
+    clean = tone(200, 4.0, 0.3) + (RNG.normal(0, 0.01, 4*SR)).astype(np.float32)
+    found = dsp.find_tonal_noises(clean, SR)
+    assert not any(1000 < f < 7000 for f in found)
+
+
+def test_remove_tonal_noises_crushes_whine_keeps_voice():
+    voice, whine = tone(200, 5.0, 0.3), tone(3500, 5.0, 0.05)
+    out = dsp.remove_tonal_noises(voice + whine, SR, [3500.0])[2*SR:]
+    spec = np.abs(np.fft.rfft(out)); fq = np.fft.rfftfreq(len(out), 1/SR)
+    peak = lambda f: spec[np.abs(fq - f) < 3].max()
+    assert peak(3500) < 0.05 * peak(200)          # whine crushed
+    ref = np.abs(np.fft.rfft((voice)[2*SR:]))
+    assert peak(200) > 0.9 * ref[np.abs(fq-200) < 3].max()  # voice intact

@@ -39,8 +39,11 @@ class EnhanceSettings:
     # Filtering / noise
     highpass_hz: float = 80.0
     dehum_hz: float = 0.0            # 0 = off; set 50 (EU) or 60 (US)
+    auto_notch: bool = True          # auto-remove tonal whines/beeps
+    backend: str = "spectral"        # "spectral" (built-in) or "deep" (DeepFilterNet)
     noise_reduction_strength: float = 0.85
     stationary_noise: bool = False
+    two_pass_noise_reduction: bool = True  # stationary pass then adaptive pass
 
     # Dynamics
     gate_threshold_db: float = -45.0  # 0 disables (use with gate_ratio)
@@ -66,6 +69,7 @@ PRESETS: dict[str, EnhanceSettings] = {
     "gentle": EnhanceSettings(
         noise_reduction_strength=0.6, comp_ratio=2.0, gate_ratio=1.5,
         presence_db=1.5, air_db=1.0, deess_ratio=2.0,
+        two_pass_noise_reduction=False,
     ),
     "aggressive": EnhanceSettings(
         noise_reduction_strength=0.95, comp_ratio=4.0, comp_threshold_db=-24.0,
@@ -93,15 +97,23 @@ def highpass(audio: np.ndarray, sr: int, cutoff_hz: float = 80.0) -> np.ndarray:
 
 
 def reduce_noise(
-    audio: np.ndarray, sr: int, strength: float = 0.85, stationary: bool = False
+    audio: np.ndarray, sr: int, strength: float = 0.85,
+    stationary: bool = False, two_pass: bool = False,
 ) -> np.ndarray:
-    """Spectral-gating noise reduction via the noisereduce library."""
+    """Spectral-gating noise reduction via the noisereduce library.
+
+    With two_pass=True, a stationary pass first removes steady hiss and
+    tonal residue (this is what constant high-frequency noise responds to),
+    then an adaptive pass handles varying noise.
+    """
     if strength <= 0:
         return audio
+    strength = float(np.clip(strength, 0.0, 1.0))
+    if two_pass:
+        audio = nr.reduce_noise(y=audio, sr=sr, stationary=True,
+                                prop_decrease=strength * 0.6).astype(np.float32)
     cleaned = nr.reduce_noise(
-        y=audio, sr=sr,
-        prop_decrease=float(np.clip(strength, 0.0, 1.0)),
-        stationary=stationary,
+        y=audio, sr=sr, prop_decrease=strength, stationary=stationary,
     )
     return cleaned.astype(np.float32)
 
@@ -140,8 +152,22 @@ def enhance_array(
         logger.info("De-hum at %.0f Hz + harmonics", s.dehum_hz)
         audio = dsp.dehum(audio, sr, s.dehum_hz)
 
-    logger.info("Noise reduction (strength=%.2f)", s.noise_reduction_strength)
-    audio = reduce_noise(audio, sr, s.noise_reduction_strength, s.stationary_noise)
+    if s.auto_notch:
+        tones = dsp.find_tonal_noises(audio, sr)
+        if tones:
+            logger.info("Auto-notch removing tonal noise at: %s Hz",
+                        ", ".join(f"{f:.0f}" for f in tones))
+            audio = dsp.remove_tonal_noises(audio, sr, tones)
+
+    if s.backend == "deep":
+        from clearscribe.deep import deep_denoise
+        logger.info("Deep denoise (DeepFilterNet)")
+        audio = deep_denoise(audio, sr)
+    else:
+        logger.info("Noise reduction (strength=%.2f, two_pass=%s)",
+                    s.noise_reduction_strength, s.two_pass_noise_reduction)
+        audio = reduce_noise(audio, sr, s.noise_reduction_strength,
+                             s.stationary_noise, s.two_pass_noise_reduction)
 
     if s.gate_ratio > 1.0:
         logger.info("Noise gate at %.0f dB", s.gate_threshold_db)

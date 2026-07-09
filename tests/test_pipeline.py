@@ -53,3 +53,31 @@ def test_cli_conflicting_flags(noisy_wav):
 def test_cli_missing_file(tmp_path):
     rc = main([str(tmp_path / "nope.wav"), "--enhance-only"])
     assert rc == 1
+
+
+def test_deep_backend_is_dispatched(noisy_wav, tmp_path):
+    """backend='deep' must route through clearscribe.deep.deep_denoise."""
+    import numpy as np
+    from clearscribe.enhance import EnhanceSettings
+
+    with patch("clearscribe.deep.deep_denoise",
+               side_effect=lambda a, sr: np.zeros_like(a)) as mock_deep:
+        run_pipeline(noisy_wav, tmp_path / "out", transcribe=False,
+                     enhance_settings=EnhanceSettings(backend="deep"))
+    mock_deep.assert_called_once()
+
+
+def test_deep_backend_missing_gives_helpful_error(noisy_wav, tmp_path):
+    import builtins
+    from clearscribe.enhance import EnhanceSettings
+    real_import = builtins.__import__
+
+    def block_df(name, *a, **k):
+        if name.startswith("df") or name == "torch":
+            raise ImportError("nope")
+        return real_import(name, *a, **k)
+
+    with patch("builtins.__import__", side_effect=block_df):
+        with pytest.raises(ImportError, match="deepfilternet @"):
+            run_pipeline(noisy_wav, tmp_path / "out", transcribe=False,
+                         enhance_settings=EnhanceSettings(backend="deep"))

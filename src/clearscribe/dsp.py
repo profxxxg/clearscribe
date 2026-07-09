@@ -202,3 +202,58 @@ def dehum(
         b, a = iirnotch(f, q, fs=sr)
         out = sosfilt(tf2sos(b, a), out)
     return out.astype(np.float32)
+
+
+# ---------------------------------------------------------- tonal noise
+
+def find_tonal_noises(
+    audio: np.ndarray,
+    sr: int,
+    max_notches: int = 6,
+    prominence_db: float = 8.0,
+    min_hz: float = 120.0,
+) -> list[float]:
+    """Detect persistent narrowband noises (whines, beeps, electronic tones).
+
+    Builds a noise spectrum from the quietest 20% of frames, then finds
+    narrow peaks that stand more than `prominence_db` above the local
+    spectral baseline — e.g. a constant 3.5 kHz electronics whine.
+    Returns the offending frequencies in Hz, strongest first.
+    """
+    from scipy.ndimage import median_filter
+    from scipy.signal import find_peaks, stft
+
+    nperseg = 4096 if sr >= 32000 else 2048
+    freqs, _, Z = stft(audio, fs=sr, nperseg=nperseg)
+    mag = np.abs(Z)
+    if mag.shape[1] < 10:
+        return []
+
+    frame_level = mag.mean(axis=0)
+    n_quiet = max(2, mag.shape[1] // 5)
+    quiet = np.argsort(frame_level)[:n_quiet]
+    noise_db = _db(np.median(mag[:, quiet], axis=1))
+
+    # Local baseline over a ~300 Hz window; peaks are what pokes above it
+    bin_hz = sr / nperseg
+    win = max(5, int(300.0 / bin_hz)) | 1
+    baseline = median_filter(noise_db, size=win, mode="nearest")
+    excess = noise_db - baseline
+
+    peaks, props = find_peaks(excess, height=prominence_db)
+    valid = [(props["peak_heights"][i], freqs[p]) for i, p in enumerate(peaks)
+             if min_hz <= freqs[p] <= sr / 2.0 * 0.95]
+    valid.sort(reverse=True)
+    return [float(f) for _, f in valid[:max_notches]]
+
+
+def remove_tonal_noises(
+    audio: np.ndarray, sr: int, freqs_hz: list[float], q: float = 30.0
+) -> np.ndarray:
+    """Notch out each detected tonal noise (narrow — barely touches voice)."""
+    out = audio
+    for f in freqs_hz:
+        if 0 < f < sr / 2.0 * 0.95:
+            b, a = iirnotch(f, q, fs=sr)
+            out = sosfilt(tf2sos(b, a), out)
+    return out.astype(np.float32)

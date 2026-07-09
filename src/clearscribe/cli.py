@@ -32,6 +32,12 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Only enhance the audio, skip transcription")
     p.add_argument("--preset", default="podcast", choices=list(PRESETS),
                    help="Enhancement preset (default: podcast)")
+    p.add_argument("--backend", default=None, choices=["spectral", "deep"],
+                   help="Denoise engine: built-in 'spectral' or 'deep' "
+                        "(DeepFilterNet — best for background voices; "
+                        "needs the [deep] extra)")
+    p.add_argument("--no-auto-notch", action="store_true",
+                   help="Disable automatic removal of tonal whines/beeps")
     p.add_argument("--dehum", type=float, default=None, metavar="HZ",
                    help="Remove mains hum: 50 (EU) or 60 (US). Default: off")
     p.add_argument("--strength", type=float, default=None,
@@ -71,6 +77,10 @@ def main(argv: list[str] | None = None) -> int:
         settings.target_lufs = args.target_lufs
     if args.dehum is not None:
         settings.dehum_hz = args.dehum
+    if args.backend is not None:
+        settings.backend = args.backend
+    if args.no_auto_notch:
+        settings.auto_notch = False
 
     try:
         outputs = run_pipeline(

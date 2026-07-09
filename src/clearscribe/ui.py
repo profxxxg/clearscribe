@@ -25,16 +25,20 @@ except ImportError as e:  # pragma: no cover
 
 
 def _settings_from_ui(
-    preset, strength, stationary, dehum_choice, gate_thresh, comp_ratio,
-    comp_thresh, deess_ratio, warmth, presence, air, target_lufs,
+    preset, backend_choice, auto_notch, strength, stationary, dehum_choice,
+    gate_thresh, comp_ratio, comp_thresh, deess_ratio, warmth, presence, air,
+    target_lufs,
 ) -> EnhanceSettings:
     base = PRESETS.get(preset, PRESETS["podcast"])
     return EnhanceSettings(
         highpass_hz=base.highpass_hz,
         dehum_hz={"Off": 0.0, "50 Hz (EU/most of world)": 50.0,
                   "60 Hz (Americas)": 60.0}[dehum_choice],
+        backend="deep" if backend_choice.startswith("Deep") else "spectral",
+        auto_notch=auto_notch,
         noise_reduction_strength=strength,
         stationary_noise=stationary,
+        two_pass_noise_reduction=base.two_pass_noise_reduction,
         gate_threshold_db=gate_thresh,
         gate_ratio=base.gate_ratio,
         comp_threshold_db=comp_thresh,
@@ -141,23 +145,70 @@ def build_app() -> "gr.Blocks":
         preset = gr.Radio(list(PRESETS), value="podcast", label="Preset",
                           info="'podcast' is the recommended full chain")
 
-        with gr.Accordion("Advanced settings", open=False):
+        with gr.Row():
+            backend_choice = gr.Radio(
+                ["Spectral (built-in)", "Deep AI — DeepFilterNet"],
+                value="Spectral (built-in)", label="Denoise engine",
+                info="Deep AI is far better at background voices/chatter; "
+                     "needs the optional [deep] install (see INSTALL.md)")
+            auto_notch = gr.Checkbox(
+                True, label="Auto-remove tonal noises",
+                info="Finds constant whines/beeps (e.g. electronics around "
+                     "3–4 kHz) in the noise floor and notches them out")
+
+        with gr.Accordion("Advanced settings — what each control does", open=False):
+            gr.Markdown(
+                "The chain runs top to bottom: **clean → shape dynamics → shape tone → set loudness.** "
+                "Hover any control for details; presets set sensible values for all of them."
+            )
             with gr.Row():
-                strength = gr.Slider(0, 1, 0.85, step=0.05, label="Noise reduction")
-                stationary = gr.Checkbox(False, label="Stationary noise (constant hiss/hum)")
+                strength = gr.Slider(
+                    0, 1, 0.85, step=0.05, label="Noise reduction",
+                    info="How much background noise the spectral denoiser removes. "
+                         "Too high can sound 'underwater' — back off if the voice gets hollow")
+                stationary = gr.Checkbox(
+                    False, label="Stationary noise (constant hiss/hum)",
+                    info="Tick when the noise never changes: fan, hiss, air-con. "
+                         "Leave off for variable noise like traffic or chatter")
                 dehum_choice = gr.Dropdown(
                     ["Off", "50 Hz (EU/most of world)", "60 Hz (Americas)"],
-                    value="Off", label="Mains hum removal")
+                    value="Off", label="Mains hum removal",
+                    info="Notches electrical hum and its harmonics. Pick your region's "
+                         "mains frequency if you hear a low buzz")
             with gr.Row():
-                gate_thresh = gr.Slider(-70, -20, -45, step=1, label="Gate threshold (dB)")
-                comp_ratio = gr.Slider(1, 8, 3, step=0.5, label="Compressor ratio")
-                comp_thresh = gr.Slider(-40, -10, -22, step=1, label="Compressor threshold (dB)")
-                deess_ratio = gr.Slider(1, 8, 4, step=0.5, label="De-esser ratio")
+                gate_thresh = gr.Slider(
+                    -70, -20, -45, step=1, label="Gate threshold (dB)",
+                    info="Audio quieter than this is treated as a pause and pushed "
+                         "toward silence. Raise it if background sounds leak between "
+                         "words; lower it if word endings get clipped")
+                comp_ratio = gr.Slider(
+                    1, 8, 3, step=0.5, label="Compressor ratio",
+                    info="Evens out loud vs quiet speech — the core 'podcast sound'. "
+                         "2–3 = natural, 4+ = dense radio voice, 1 = off")
+                comp_thresh = gr.Slider(
+                    -40, -10, -22, step=1, label="Compressor threshold (dB)",
+                    info="Level where compression starts. Lower = more of the "
+                         "speech gets evened out")
+                deess_ratio = gr.Slider(
+                    1, 8, 4, step=0.5, label="De-esser ratio",
+                    info="Tames harsh S/SH sounds (5–9 kHz sibilance) without "
+                         "dulling the rest. 1 = off")
             with gr.Row():
-                warmth = gr.Slider(0, 6, 1.5, step=0.5, label="Warmth (dB @160 Hz)")
-                presence = gr.Slider(0, 6, 2.5, step=0.5, label="Presence (dB @3 kHz)")
-                air = gr.Slider(0, 6, 1.5, step=0.5, label="Air (dB @10 kHz)")
-                target_lufs = gr.Slider(-24, -12, -16, step=1, label="Loudness target (LUFS)")
+                warmth = gr.Slider(
+                    0, 6, 1.5, step=0.5, label="Warmth (dB @160 Hz)",
+                    info="Low-shelf boost: adds body and fullness to the voice")
+                presence = gr.Slider(
+                    0, 6, 2.5, step=0.5, label="Presence (dB @3 kHz)",
+                    info="Peak boost for clarity and intelligibility. NOTE: also "
+                         "boosts any leftover noise near 3 kHz — set to 0 if noise "
+                         "there survives denoising")
+                air = gr.Slider(
+                    0, 6, 1.5, step=0.5, label="Air (dB @10 kHz)",
+                    info="High-shelf boost: adds sparkle / 'expensive mic' sheen")
+                target_lufs = gr.Slider(
+                    -24, -12, -16, step=1, label="Loudness target (LUFS)",
+                    info="Final overall loudness. −16 is the podcast standard; "
+                         "−14 for louder platforms like Spotify")
 
         enhance_btn = gr.Button("✨ Enhance", variant="primary")
         stats_md = gr.Markdown()
@@ -181,9 +232,9 @@ def build_app() -> "gr.Blocks":
 
         enhance_btn.click(
             enhance_for_ui,
-            inputs=[input_audio, preset, strength, stationary, dehum_choice,
-                    gate_thresh, comp_ratio, comp_thresh, deess_ratio,
-                    warmth, presence, air, target_lufs],
+            inputs=[input_audio, preset, backend_choice, auto_notch, strength,
+                    stationary, dehum_choice, gate_thresh, comp_ratio,
+                    comp_thresh, deess_ratio, warmth, presence, air, target_lufs],
             outputs=[output_audio, enhanced_state, stats_md],
         )
         transcribe_btn.click(

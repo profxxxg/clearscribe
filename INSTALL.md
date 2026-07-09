@@ -191,7 +191,7 @@ built-in denoiser can't handle, install the DeepFilterNet backend.
 **If your Python is 3.8–3.11**, it's just:
 
 ```bash
-pip install torch deepfilternet
+pip install torch torchaudio deepfilternet
 ```
 
 **If your Python is 3.12 or newer**, run ClearScribe in a Python 3.11
@@ -216,7 +216,7 @@ environment instead (both Pythons coexist happily):
 3. Install everything in it:
    ```bash
    pip install ".[ui]"
-   pip install torch deepfilternet
+   pip install torch torchaudio deepfilternet
    ```
 
 (Alternative for those who want to stay on 3.12: install
@@ -246,6 +246,7 @@ difference on background voices is night and day.
 | Enhanced audio sounds over-processed | Try the `gentle` preset, or lower the noise-reduction and compressor sliders |
 | Background voices still audible | Spectral denoising can't separate voice from voice — install the Deep AI engine (section above) and select it |
 | `Cargo, the Rust package manager, is not installed` when installing deepfilternet | You're on Python 3.12+ where no prebuilt wheels exist — use a Python 3.11 venv as shown in the Deep AI section above |
+| `No module named 'torchaudio'` when using Deep AI | Install it in the same venv: `pip install torchaudio` (if versions clash: `pip install torch torchaudio --upgrade`) |
 | `'py' is not recognized` (Windows) | The `py` launcher is missing — common if your Python came from the Microsoft Store. Install Python from [python.org](https://www.python.org/downloads/) (the launcher is included), **open a new terminal**, and retry. Or call the interpreter directly: `"%LOCALAPPDATA%\Programs\Python\Python311\python.exe" -m venv .venv311` |
 | A constant whine/beep survives (often 1–8 kHz) | Make sure **Auto-remove tonal noises** is ticked (it's on by default); also try setting the Presence EQ slider to 0 so leftover noise there isn't boosted |
 

@@ -36,8 +36,8 @@ def test_settings_from_ui_deep_backend():
 
 def test_enhance_for_ui_end_to_end(noisy_wav):
     out_path, state_path, stats = enhance_for_ui(
-        str(noisy_wav), "podcast", "Spectral (built-in)", True, 0.85, False,
-        "Off", -45, 3.0, -22, 4.0, 1.5, 2.5, 1.5, -16,
+        str(noisy_wav), None, "podcast", "Spectral (built-in)", True, 0.85,
+        False, "Off", -45, 3.0, -22, 4.0, 1.5, 2.5, 1.5, -16,
     )
     assert out_path == state_path
     assert out_path.endswith(".enhanced.wav")
@@ -46,5 +46,18 @@ def test_enhance_for_ui_end_to_end(noisy_wav):
 
 def test_enhance_for_ui_rejects_missing_file():
     with pytest.raises(gr.Error):
-        enhance_for_ui(None, "podcast", "Spectral (built-in)", True, 0.85,
-                       False, "Off", -45, 3.0, -22, 4.0, 1.5, 2.5, 1.5, -16)
+        enhance_for_ui(None, None, "podcast", "Spectral (built-in)", True,
+                       0.85, False, "Off", -45, 3.0, -22, 4.0, 1.5, 2.5, 1.5,
+                       -16)
+
+
+def test_settings_to_knobs_roundtrip():
+    from clearscribe.enhance import EnhanceSettings
+    from clearscribe.ui import _settings_from_ui, _settings_to_knobs
+    s = EnhanceSettings(backend="deep", dehum_hz=60.0, comp_ratio=5.0,
+                        auto_notch=False, target_lufs=-18.0)
+    knobs = _settings_to_knobs(s)
+    rebuilt = _settings_from_ui("podcast", *knobs)
+    assert rebuilt.backend == "deep" and rebuilt.dehum_hz == 60.0
+    assert rebuilt.comp_ratio == 5.0 and rebuilt.target_lufs == -18.0
+    assert not rebuilt.auto_notch

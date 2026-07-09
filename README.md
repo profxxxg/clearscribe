@@ -18,6 +18,7 @@ Then pick **Deep AI** in the web app, or use `--backend deep` on the CLI. The mo
 
 ## What it does
 
+0. **Takes (almost) anything as input** — audio in any common format (WAV, MP3, FLAC, M4A, AAC, OGG, OPUS...) **or video** (MP4, MKV, MOV, WEBM...): the audio track is extracted automatically via a bundled ffmpeg, no system install needed
 1. **Enhances your audio with a full broadcast chain**
    - High-pass filter removes low-frequency rumble and handling noise
    - Mains **de-hum** notches out 50/60 Hz hum and its harmonics
@@ -103,6 +104,14 @@ from clearscribe.pipeline import run_pipeline
 outputs = run_pipeline("interview.wav", "out/", formats=["srt", "json"])
 print(outputs["srt"].read_text())
 ```
+
+## Saving your settings
+
+Dialled in the advanced settings for your mic and room? Type a name and hit **💾 Save preset** in the web app — it appears under "My saved presets" forever after (stored in `~/.clearscribe/presets.json`). On the CLI: `--save-preset my-mic` to save, `--preset my-mic` to reuse.
+
+## How big a file can it handle?
+
+There's no hard limit — the practical ceiling is your RAM and patience. Rough estimates for the built-in spectral engine: peak memory is on the order of **1–1.5 GB per 10 minutes** of audio, so on an 8 GB machine keep files under ~30–40 minutes, on 16 GB about an hour is comfortable. The Deep AI engine uses similar memory but more CPU time (very roughly 1–3 minutes of processing per 10 minutes of audio on a typical laptop). Video container size barely matters — a 2 GB MP4 with a 20-minute soundtrack is fine, since only the audio track is extracted. For multi-hour recordings, split the file first.
 
 ## Run the tests
 

@@ -15,6 +15,8 @@ import soundfile as sf
 from clearscribe import __version__
 from clearscribe.enhance import PRESETS, EnhanceSettings, enhance_array, load_mono
 from clearscribe.formats import WRITERS
+from clearscribe.media import expose_ffmpeg_on_path
+from clearscribe.presets import load_user_presets, save_user_preset
 
 try:
     import gradio as gr
@@ -52,6 +54,21 @@ def _settings_from_ui(
     )
 
 
+KNOB_ORDER = "backend auto_notch strength stationary dehum gate comp_ratio " \
+             "comp_thresh deess warmth presence air lufs".split()
+
+
+def _settings_to_knobs(s: EnhanceSettings):
+    """Map an EnhanceSettings onto the 13 UI controls (KNOB_ORDER)."""
+    backend = "Deep AI — DeepFilterNet" if s.backend == "deep" else "Spectral (built-in)"
+    dehum = {50.0: "50 Hz (EU/most of world)", 60.0: "60 Hz (Americas)"}.get(
+        s.dehum_hz, "Off")
+    return (backend, s.auto_notch, s.noise_reduction_strength,
+            s.stationary_noise, dehum, s.gate_threshold_db, s.comp_ratio,
+            s.comp_threshold_db, s.deess_ratio, s.warmth_db, s.presence_db,
+            s.air_db, s.target_lufs)
+
+
 def _apply_preset(preset: str):
     s = PRESETS[preset]
     return (s.noise_reduction_strength, s.gate_threshold_db, s.comp_ratio,
@@ -59,13 +76,19 @@ def _apply_preset(preset: str):
             s.air_db, s.target_lufs)
 
 
-def enhance_for_ui(audio_path, *ui_args, progress=gr.Progress()):
+def enhance_for_ui(file_path, mic_path, *ui_args, progress=gr.Progress()):
+    audio_path = file_path or mic_path
     if not audio_path:
-        raise gr.Error("Please upload an audio file first.")
-    progress(0.1, desc="Loading audio")
+        raise gr.Error("Please upload a file or record something first.")
+    progress(0.1, desc="Loading / decoding audio")
     audio, sr = load_mono(audio_path)
     if len(audio) < sr * 0.25:
         raise gr.Error("Audio is too short (need at least 0.25 s).")
+    minutes = len(audio) / sr / 60.0
+    if minutes > 40:
+        gr.Warning(f"This is a long recording ({minutes:.0f} min) — processing "
+                   "may take a while and use several GB of RAM. Consider "
+                   "splitting files over ~1 hour.")
 
     progress(0.3, desc="Enhancing (denoise → gate → compress → de-ess → EQ)")
     settings = _settings_from_ui(*ui_args)
@@ -135,8 +158,11 @@ def build_app() -> "gr.Blocks":
         with gr.Row():
             with gr.Column():
                 gr.Markdown("### 1 · Original")
-                input_audio = gr.Audio(label="Upload audio", type="filepath",
-                                       sources=["upload", "microphone"])
+                input_file = gr.File(
+                    label="Upload audio or video (WAV, MP3, M4A, MP4, MKV, ...)",
+                    type="filepath")
+                mic_audio = gr.Audio(label="... or record", type="filepath",
+                                     sources=["microphone"])
             with gr.Column():
                 gr.Markdown("### 2 · Enhanced — compare side by side")
                 output_audio = gr.Audio(label="Enhanced result", type="filepath",
@@ -144,6 +170,16 @@ def build_app() -> "gr.Blocks":
 
         preset = gr.Radio(list(PRESETS), value="podcast", label="Preset",
                           info="'podcast' is the recommended full chain")
+
+        with gr.Row():
+            user_preset_dd = gr.Dropdown(
+                choices=sorted(load_user_presets()), value=None,
+                label="My saved presets",
+                info="Pick one to load all its settings")
+            preset_name_box = gr.Textbox(
+                label="Save current settings as",
+                placeholder="e.g. my-usb-mic")
+            save_preset_btn = gr.Button("💾 Save preset")
 
         with gr.Row():
             backend_choice = gr.Radio(
@@ -230,11 +266,35 @@ def build_app() -> "gr.Blocks":
                  warmth, presence, air, target_lufs]
         preset.change(_apply_preset, inputs=preset, outputs=knobs)
 
+        all_knobs = [backend_choice, auto_notch, strength, stationary,
+                     dehum_choice, gate_thresh, comp_ratio, comp_thresh,
+                     deess_ratio, warmth, presence, air, target_lufs]
+
+        def _save_preset(name, preset_val, *knob_vals):
+            settings = _settings_from_ui(preset_val, *knob_vals)
+            try:
+                save_user_preset(name, settings)
+            except ValueError as e:
+                raise gr.Error(str(e))
+            gr.Info(f"Saved preset '{name.strip()}'")
+            return gr.update(choices=sorted(load_user_presets()),
+                             value=name.strip())
+
+        def _load_preset(name):
+            presets = load_user_presets()
+            if not name or name not in presets:
+                return [gr.update()] * len(all_knobs)
+            return list(_settings_to_knobs(presets[name]))
+
+        save_preset_btn.click(_save_preset,
+                              inputs=[preset_name_box, preset] + all_knobs,
+                              outputs=user_preset_dd)
+        user_preset_dd.change(_load_preset, inputs=user_preset_dd,
+                              outputs=all_knobs)
+
         enhance_btn.click(
             enhance_for_ui,
-            inputs=[input_audio, preset, backend_choice, auto_notch, strength,
-                    stationary, dehum_choice, gate_thresh, comp_ratio,
-                    comp_thresh, deess_ratio, warmth, presence, air, target_lufs],
+            inputs=[input_file, mic_audio, preset] + all_knobs,
             outputs=[output_audio, enhanced_state, stats_md],
         )
         transcribe_btn.click(
@@ -249,6 +309,7 @@ def build_app() -> "gr.Blocks":
 
 
 def main() -> None:  # entry point: clearscribe-ui
+    expose_ffmpeg_on_path()  # Gradio needs `ffmpeg` to convert mic recordings
     build_app().launch()
 
 

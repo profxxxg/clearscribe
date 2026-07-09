@@ -120,6 +120,21 @@ under **Advanced settings**. To stop the app, press `Ctrl+C` in the terminal.
 
 ---
 
+## 5½ · Everyday use — no reinstalling!
+
+All the `pip install` steps above are **one-time**. The packages live inside
+the `.venv` folder. From then on, using ClearScribe is just:
+
+```powershell
+cd path\to\clearscribe
+.venv\Scripts\activate     # (source .venv/bin/activate on macOS/Linux)
+clearscribe-ui
+```
+
+You only run pip again when updating ClearScribe itself (section 9).
+
+---
+
 ## 6 · Use the command line
 
 ```bash
@@ -238,7 +253,7 @@ difference on background voices is night and day.
 | `python` / `pip` is not recognized (Windows) | Reinstall Python with **"Add Python to PATH"** ticked, or use `py -m pip ...` |
 | `clearscribe: command not found` | Your venv isn't activated — redo step 3's activate command |
 | PowerShell won't activate the venv | `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`, or use CMD |
-| Error opening an `.m4a` / `.aac` file for enhancement | The audio loader (libsndfile) doesn't read M4A. Convert first: `ffmpeg -i input.m4a input.wav` — WAV, MP3, FLAC, and OGG work out of the box |
+| Microphone recording makes the app freeze | Fixed in v0.4.0 (Gradio needs ffmpeg to convert browser recordings — ClearScribe now provides it automatically). Update ClearScribe, restart `clearscribe-ui`, and make sure you click the stop button to end the recording. Also check the browser mic-permission prompt |
 | First transcription hangs at the start | It's downloading the Whisper model (one-time, ~500 MB for `small`) — watch the terminal for progress |
 | Transcription is slow | Use a smaller model: `--model base` or `--model tiny`; larger = more accurate but slower on CPU |
 | Wrong language detected | Set it explicitly: `--language en` (or type it in the UI's language box) |

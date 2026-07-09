@@ -83,8 +83,18 @@ PRESETS: dict[str, EnhanceSettings] = {
 
 
 def load_mono(path: str | Path) -> tuple[np.ndarray, int]:
-    """Load an audio file as mono float32. Returns (samples, sample_rate)."""
-    audio, sr = sf.read(str(path), dtype="float32", always_2d=True)
+    """Load any audio or video file as mono float32.
+
+    Tries libsndfile first (WAV/FLAC/MP3/OGG...); anything else — M4A, AAC,
+    video containers like MP4/MKV/MOV — is decoded via the bundled ffmpeg.
+    Returns (samples, sample_rate).
+    """
+    try:
+        audio, sr = sf.read(str(path), dtype="float32", always_2d=True)
+    except Exception:
+        from clearscribe import media
+        wav = media.to_wav(path)
+        audio, sr = sf.read(str(wav), dtype="float32", always_2d=True)
     return audio.mean(axis=1), sr
 
 

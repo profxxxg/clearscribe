@@ -8,6 +8,7 @@ import sys
 
 from clearscribe import __version__
 from clearscribe.enhance import PRESETS, EnhanceSettings
+from clearscribe.presets import all_presets, save_user_preset
 from clearscribe.pipeline import run_pipeline
 
 
@@ -30,8 +31,11 @@ def build_parser() -> argparse.ArgumentParser:
                    help="Skip enhancement, transcribe the original audio")
     p.add_argument("--enhance-only", action="store_true",
                    help="Only enhance the audio, skip transcription")
-    p.add_argument("--preset", default="podcast", choices=list(PRESETS),
-                   help="Enhancement preset (default: podcast)")
+    p.add_argument("--preset", default="podcast", choices=list(all_presets()),
+                   help="Enhancement preset — built-in or one you saved "
+                        "(default: podcast)")
+    p.add_argument("--save-preset", metavar="NAME", default=None,
+                   help="Save the resulting settings under this name for reuse")
     p.add_argument("--backend", default=None, choices=["spectral", "deep"],
                    help="Denoise engine: built-in 'spectral' or 'deep' "
                         "(DeepFilterNet — best for background voices; "
@@ -66,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
 
     import dataclasses
-    settings = dataclasses.replace(PRESETS[args.preset])
+    settings = dataclasses.replace(all_presets()[args.preset])
     if args.highpass is not None:
         settings.highpass_hz = args.highpass
     if args.strength is not None:
@@ -81,6 +85,14 @@ def main(argv: list[str] | None = None) -> int:
         settings.backend = args.backend
     if args.no_auto_notch:
         settings.auto_notch = False
+
+    if args.save_preset:
+        try:
+            save_user_preset(args.save_preset, settings)
+            print(f"Saved preset '{args.save_preset}'.")
+        except ValueError as e:
+            print(f"error: {e}", file=sys.stderr)
+            return 2
 
     try:
         outputs = run_pipeline(

@@ -1,0 +1,193 @@
+# 📦 Installation & Usage Guide
+
+This guide takes you from nothing to a working ClearScribe in about 5 minutes.
+It covers **Windows**, **macOS**, and **Linux**.
+
+---
+
+## 1 · Prerequisites
+
+You need **Python 3.10 or newer**.
+
+Check what you have:
+
+```bash
+python --version        # Windows
+python3 --version       # macOS / Linux
+```
+
+If it prints `3.10.x` or higher, you're good. If not, install Python from
+[python.org/downloads](https://www.python.org/downloads/).
+**Windows users:** during installation, tick ✅ **"Add Python to PATH"** —
+this is the #1 cause of `python is not recognized` errors.
+
+Optional: [Git](https://git-scm.com/downloads), for cloning the repo.
+No Git? Click **Code → Download ZIP** on the GitHub page and extract it instead.
+
+---
+
+## 2 · Get the code
+
+```bash
+git clone https://github.com/Profxxxg/clearscribe.git
+cd clearscribe
+```
+
+(Or extract the downloaded ZIP and open a terminal inside the extracted folder.)
+
+---
+
+## 3 · Create a virtual environment (recommended)
+
+This keeps ClearScribe's dependencies separate from the rest of your system.
+
+**Windows (PowerShell or CMD):**
+
+```powershell
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+> If PowerShell complains about execution policy, run:
+> `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
+> then try activating again — or just use CMD instead.
+
+**macOS / Linux:**
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+Your prompt should now start with `(.venv)`. Do this activation step again
+whenever you come back in a new terminal.
+
+---
+
+## 4 · Install ClearScribe
+
+**With the web app (recommended for most people):**
+
+```bash
+pip install ".[ui]"
+```
+
+**CLI / library only (lighter):**
+
+```bash
+pip install .
+```
+
+This pulls in the open-source stack: `noisereduce`, `pyloudnorm`, `scipy`,
+`soundfile`, `faster-whisper` — and `gradio` if you chose `[ui]`.
+
+Verify it worked:
+
+```bash
+clearscribe --version
+```
+
+---
+
+## 5 · Use the web app
+
+```bash
+clearscribe-ui
+```
+
+Your terminal prints a local address, usually `http://127.0.0.1:7860`.
+Open it in any browser. Then:
+
+1. **Upload** an audio file (or click the microphone icon to record directly)
+2. Pick a **preset** — `podcast` is the recommended full chain
+3. Click **✨ Enhance**
+4. **Compare before and after** — the original and enhanced players sit side
+   by side, and a stats table shows the measured noise floor, loudness, and
+   peak levels for both
+5. (Optional) Click **📝 Transcribe enhanced audio** — pick a Whisper model
+   size and formats (TXT, SRT, VTT, JSON), then download the transcript files
+
+Tweak any stage (noise reduction, gate, compressor, de-esser, EQ, loudness)
+under **Advanced settings**. To stop the app, press `Ctrl+C` in the terminal.
+
+> **First transcription is slow — that's normal.** faster-whisper downloads
+> the model on first use (~500 MB for `small`) and caches it. Every run after
+> that starts instantly. You need an internet connection for that first run only.
+
+---
+
+## 6 · Use the command line
+
+```bash
+# Enhance + transcribe with defaults (podcast preset; txt + srt out)
+clearscribe interview.wav
+
+# Choose formats, model, and language
+clearscribe podcast.mp3 --formats txt,srt,vtt,json --model medium --language en
+
+# Only clean up the audio
+clearscribe voiceover.wav --enhance-only --preset aggressive --dehum 50
+
+# Only transcribe, skip enhancement
+clearscribe lecture.wav --no-enhance --model small
+```
+
+Results land in `clearscribe_output/` (change with `-o mydir`).
+Run `clearscribe --help` for every option.
+
+---
+
+## 7 · Use it as a Python library
+
+```python
+from clearscribe.pipeline import run_pipeline
+from clearscribe.enhance import PRESETS
+
+outputs = run_pipeline(
+    "interview.wav", "out/",
+    formats=["srt", "json"],
+    enhance_settings=PRESETS["podcast"],
+)
+print(outputs["srt"].read_text(encoding="utf-8"))
+```
+
+---
+
+## 8 · Run the tests (for contributors)
+
+```bash
+pip install ".[dev]"
+pytest -v
+```
+
+All 28 tests run fully offline — transcription is mocked and the DSP stages
+are verified against synthetic audio with measurable assertions.
+
+---
+
+## 9 · Updating
+
+```bash
+cd clearscribe
+git pull
+pip install ".[ui]" --upgrade
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Fix |
+|---|---|
+| `python` / `pip` is not recognized (Windows) | Reinstall Python with **"Add Python to PATH"** ticked, or use `py -m pip ...` |
+| `clearscribe: command not found` | Your venv isn't activated — redo step 3's activate command |
+| PowerShell won't activate the venv | `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`, or use CMD |
+| Error opening an `.m4a` / `.aac` file for enhancement | The audio loader (libsndfile) doesn't read M4A. Convert first: `ffmpeg -i input.m4a input.wav` — WAV, MP3, FLAC, and OGG work out of the box |
+| First transcription hangs at the start | It's downloading the Whisper model (one-time, ~500 MB for `small`) — watch the terminal for progress |
+| Transcription is slow | Use a smaller model: `--model base` or `--model tiny`; larger = more accurate but slower on CPU |
+| Wrong language detected | Set it explicitly: `--language en` (or type it in the UI's language box) |
+| Port 7860 already in use | Another Gradio app is running — close it, or `GRADIO_SERVER_PORT=7861 clearscribe-ui` |
+| Enhanced audio sounds over-processed | Try the `gentle` preset, or lower the noise-reduction and compressor sliders |
+
+Still stuck? [Open an issue](https://github.com/Profxxxg/clearscribe/issues) —
+include your OS, Python version, and the full error message.

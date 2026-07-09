@@ -18,6 +18,8 @@ Feed it a noisy voice recording. Get back a cleaned-up audio file plus transcrip
 2. **Transcribes it** with [faster-whisper](https://github.com/SYSTRAN/faster-whisper), an optimised open-source implementation of OpenAI's Whisper — multilingual, accurate, and fast on CPU
 3. **Writes transcripts** as plain text, SRT subtitles, WebVTT captions, and structured JSON
 
+> 📖 **New here? Follow the [step-by-step Installation & Usage Guide](INSTALL.md)** — Windows, macOS, and Linux, with troubleshooting.
+
 ## Web app (easiest)
 
 ```bash

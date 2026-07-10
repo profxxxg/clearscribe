@@ -253,7 +253,7 @@ difference on background voices is night and day.
 | `python` / `pip` is not recognized (Windows) | Reinstall Python with **"Add Python to PATH"** ticked, or use `py -m pip ...` |
 | `clearscribe: command not found` | Your venv isn't activated — redo step 3's activate command |
 | PowerShell won't activate the venv | `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`, or use CMD |
-| Microphone recording makes the app freeze | Fixed in v0.4.0 (Gradio needs ffmpeg to convert browser recordings — ClearScribe now provides it automatically). Update ClearScribe, restart `clearscribe-ui`, and make sure you click the stop button to end the recording. Also check the browser mic-permission prompt |
+| Mic recording shows **0:00** and the page hangs | The browser's recorder produced no audio — this fails **in the browser**, before ClearScribe receives anything. In order: ① check the site's microphone permission (padlock icon in the address bar); ② check Windows Settings → Privacy → Microphone allows desktop apps/browsers; ③ try Chrome or Edge — Brave and strict-privacy browsers often block the recording APIs; ④ update Gradio: `pip install -U gradio`; ⑤ reliable fallback: record with your system voice recorder (Windows Sound Recorder saves .m4a) and upload the file — ClearScribe accepts it directly |
 | First transcription hangs at the start | It's downloading the Whisper model (one-time, ~500 MB for `small`) — watch the terminal for progress |
 | Transcription is slow | Use a smaller model: `--model base` or `--model tiny`; larger = more accurate but slower on CPU |
 | Wrong language detected | Set it explicitly: `--language en` (or type it in the UI's language box) |

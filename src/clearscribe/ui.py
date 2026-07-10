@@ -15,7 +15,7 @@ import soundfile as sf
 from clearscribe import __version__
 from clearscribe.enhance import PRESETS, EnhanceSettings, enhance_array, load_mono
 from clearscribe.formats import WRITERS
-from clearscribe.media import expose_ffmpeg_on_path
+from clearscribe.media import expose_ffmpeg_on_path, to_wav
 from clearscribe.presets import load_user_presets, save_user_preset
 
 try:
@@ -81,9 +81,19 @@ def enhance_for_ui(file_path, mic_path, *ui_args, progress=gr.Progress()):
     if not audio_path:
         raise gr.Error("Please upload a file or record something first.")
     progress(0.1, desc="Loading / decoding audio")
-    audio, sr = load_mono(audio_path)
+    try:
+        audio, sr = load_mono(audio_path)
+    except Exception as e:
+        raise gr.Error(
+            f"Couldn't read this file ({e}). If this was a microphone "
+            "recording showing 0:00, the browser produced an empty file — "
+            "see the recording tips in INSTALL.md, or record with your "
+            "system's voice recorder and upload the file instead.")
     if len(audio) < sr * 0.25:
-        raise gr.Error("Audio is too short (need at least 0.25 s).")
+        raise gr.Error(
+            "Audio is too short or empty (under 0.25 s). If this was a mic "
+            "recording at 0:00, your browser's recorder failed — check the "
+            "mic permission, try Chrome/Edge, or upload a file instead.")
     minutes = len(audio) / sr / 60.0
     if minutes > 40:
         gr.Warning(f"This is a long recording ({minutes:.0f} min) — processing "
@@ -95,11 +105,16 @@ def enhance_for_ui(file_path, mic_path, *ui_args, progress=gr.Progress()):
     enhanced = enhance_array(audio, sr, settings)
 
     progress(0.9, desc="Writing output")
-    out = Path(tempfile.mkdtemp()) / (Path(audio_path).stem + ".enhanced.wav")
+    outdir = Path(tempfile.mkdtemp())
+    out = outdir / (Path(audio_path).stem + ".enhanced.wav")
     sf.write(str(out), enhanced, sr, subtype="PCM_16")
+    # Always-playable copy of exactly what was enhanced (video/M4A sources
+    # may not play in the browser directly)
+    orig = outdir / (Path(audio_path).stem + ".original.wav")
+    sf.write(str(orig), audio, sr, subtype="PCM_16")
 
     stats = _stats_markdown(audio, enhanced, sr)
-    return str(out), str(out), stats
+    return str(orig), str(out), str(out), stats
 
 
 def _stats_markdown(before: np.ndarray, after: np.ndarray, sr: int) -> str:
@@ -161,8 +176,10 @@ def build_app() -> "gr.Blocks":
                 input_file = gr.File(
                     label="Upload audio or video (WAV, MP3, M4A, MP4, MKV, ...)",
                     type="filepath")
+                original_audio = gr.Audio(label="Original — listen",
+                                          type="filepath", interactive=False)
                 mic_audio = gr.Audio(label="... or record", type="filepath",
-                                     sources=["microphone"])
+                                     sources=["microphone"], format="wav")
             with gr.Column():
                 gr.Markdown("### 2 · Enhanced — compare side by side")
                 output_audio = gr.Audio(label="Enhanced result", type="filepath",
@@ -262,6 +279,41 @@ def build_app() -> "gr.Blocks":
         transcript_box = gr.Textbox(label="Transcript", lines=6)
         transcript_files = gr.Files(label="Download transcripts")
 
+        _PLAYABLE = {".wav", ".mp3", ".ogg", ".oga", ".flac", ".m4a", ".opus"}
+
+        def _preview_original(path):
+            if not path:
+                return None
+            p = Path(path)
+            if p.suffix.lower() in _PLAYABLE:
+                return str(p)
+            try:  # video or exotic audio: extract a playable wav
+                return str(to_wav(p))
+            except RuntimeError as e:
+                raise gr.Error(str(e))
+
+        input_file.change(_preview_original, inputs=input_file,
+                          outputs=original_audio)
+
+        def _check_recording(path):
+            if not path:
+                return
+            try:
+                a, rec_sr = load_mono(path)
+                too_short = len(a) < rec_sr * 0.25
+            except Exception:
+                too_short = True
+            if too_short:
+                gr.Warning(
+                    "That recording came back empty (0:00) — the browser's "
+                    "recorder failed before ClearScribe received any audio. "
+                    "Check the microphone permission for this site, try "
+                    "Chrome or Edge (Brave/strict privacy modes often block "
+                    "recording), or record with your system voice recorder "
+                    "and upload the file.")
+
+        mic_audio.change(_check_recording, inputs=mic_audio, outputs=[])
+
         knobs = [strength, gate_thresh, comp_ratio, comp_thresh, deess_ratio,
                  warmth, presence, air, target_lufs]
         preset.change(_apply_preset, inputs=preset, outputs=knobs)
@@ -295,7 +347,7 @@ def build_app() -> "gr.Blocks":
         enhance_btn.click(
             enhance_for_ui,
             inputs=[input_file, mic_audio, preset] + all_knobs,
-            outputs=[output_audio, enhanced_state, stats_md],
+            outputs=[original_audio, output_audio, enhanced_state, stats_md],
         )
         transcribe_btn.click(
             transcribe_for_ui,

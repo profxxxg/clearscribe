@@ -35,12 +35,16 @@ def test_settings_from_ui_deep_backend():
 
 
 def test_enhance_for_ui_end_to_end(noisy_wav):
-    out_path, state_path, stats = enhance_for_ui(
+    orig_path, out_path, state_path, stats = enhance_for_ui(
         str(noisy_wav), None, "podcast", "Spectral (built-in)", True, 0.85,
         False, "Off", -45, 3.0, -22, 4.0, 1.5, 2.5, 1.5, -16,
     )
     assert out_path == state_path
     assert out_path.endswith(".enhanced.wav")
+    assert orig_path.endswith(".original.wav")  # before-audio is playable
+    import soundfile as sf
+    a, _ = sf.read(orig_path); b, _ = sf.read(out_path)
+    assert len(a) == len(b)  # aligned for fair A/B comparison
     assert "Noise floor" in stats
 
 

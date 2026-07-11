@@ -17,6 +17,7 @@ from clearscribe.enhance import PRESETS, EnhanceSettings, enhance_array, load_mo
 from clearscribe.formats import WRITERS
 from clearscribe.media import expose_ffmpeg_on_path, to_wav
 from clearscribe.presets import load_user_presets, save_user_preset
+from clearscribe.recorder import SystemRecorder
 
 try:
     import gradio as gr
@@ -180,6 +181,12 @@ def build_app() -> "gr.Blocks":
                                           type="filepath", interactive=False)
                 mic_audio = gr.Audio(label="... or record", type="filepath",
                                      sources=["microphone"], format="wav")
+                gr.Markdown("Browser recorder not working (0:00 / freeze)? "
+                            "Use the **system mic** instead:")
+                with gr.Row():
+                    rec_start_btn = gr.Button("🎙️ Record (system mic)")
+                    rec_stop_btn = gr.Button("⏹ Stop & use recording")
+                rec_status = gr.Markdown("")
             with gr.Column():
                 gr.Markdown("### 2 · Enhanced — compare side by side")
                 output_audio = gr.Audio(label="Enhanced result", type="filepath",
@@ -278,6 +285,26 @@ def build_app() -> "gr.Blocks":
         transcribe_btn = gr.Button("📝 Transcribe enhanced audio")
         transcript_box = gr.Textbox(label="Transcript", lines=6)
         transcript_files = gr.Files(label="Download transcripts")
+
+        _recorder = SystemRecorder()
+
+        def _rec_start():
+            try:
+                _recorder.start()
+            except RuntimeError as e:
+                raise gr.Error(str(e))
+            return ("🔴 **Recording from the system microphone…** "
+                    "speak, then press ⏹ Stop.")
+
+        def _rec_stop():
+            try:
+                path = _recorder.stop()
+            except RuntimeError as e:
+                raise gr.Error(str(e))
+            return str(path), "✅ Recording captured — press ✨ Enhance."
+
+        rec_start_btn.click(_rec_start, outputs=rec_status)
+        rec_stop_btn.click(_rec_stop, outputs=[mic_audio, rec_status])
 
         _PLAYABLE = {".wav", ".mp3", ".ogg", ".oga", ".flac", ".m4a", ".opus"}
 

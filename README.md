@@ -18,7 +18,7 @@ Then pick **Deep AI** in the web app, or use `--backend deep` on the CLI. The mo
 
 ## What it does
 
-0. **Takes (almost) anything as input** — audio in any common format (WAV, MP3, FLAC, M4A, AAC, OGG, OPUS...) **or video** (MP4, MKV, MOV, WEBM...): the audio track is extracted automatically via a bundled ffmpeg, no system install needed
+0. **Records directly from your system microphone** (browser-independent — works even where browser recording is blocked): audio in any common format (WAV, MP3, FLAC, M4A, AAC, OGG, OPUS...) **or video** (MP4, MKV, MOV, WEBM...): the audio track is extracted automatically via a bundled ffmpeg, no system install needed
 1. **Enhances your audio with a full broadcast chain**
    - High-pass filter removes low-frequency rumble and handling noise
    - Mains **de-hum** notches out 50/60 Hz hum and its harmonics

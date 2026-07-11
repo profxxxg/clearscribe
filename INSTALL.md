@@ -1,30 +1,28 @@
 # 📦 Installation & Usage Guide
 
-This guide takes you from nothing to a working ClearScribe in about 5 minutes.
-It covers **Windows**, **macOS**, and **Linux**.
+The **recommended setup** below gives you the full ClearScribe: the broadcast
+enhancement chain **plus the Deep AI engine** (DeepFilterNet), which is what
+removes background voices and heavy noise. It takes ~10 minutes, mostly
+downloads. A lighter install without Deep AI is at the end.
+
+> ℹ️ Why Python 3.11 specifically? The Deep AI engine's compiled component
+> ships prebuilt only for Python 3.8–3.11. Python 3.11 alongside your other
+> Pythons is completely fine — the setup below keeps everything in its own
+> virtual environment.
 
 ---
 
-## 1 · Prerequisites
+## 1 · Install Python 3.11
 
-You need **Python 3.10 or newer**.
+Use **3.11.9** — the last 3.11 with a Windows installer (newer 3.11.x are
+source-only security releases):
 
-Check what you have:
+- [Direct installer download (Windows 64-bit)](https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe)
+- [Release page](https://www.python.org/downloads/release/python-3119/) (macOS installer there too; Linux: `sudo apt install python3.11 python3.11-venv` or your distro's equivalent)
 
-```bash
-python --version        # Windows
-python3 --version       # macOS / Linux
-```
-
-If it prints `3.10.x` or higher, you're good. If not, install Python from
-[python.org/downloads](https://www.python.org/downloads/).
-**Windows users:** during installation, tick ✅ **"Add Python to PATH"** —
-this is the #1 cause of `python is not recognized` errors.
-
-Optional: [Git](https://git-scm.com/downloads), for cloning the repo.
-No Git? Click **Code → Download ZIP** on the GitHub page and extract it instead.
-
----
+**Windows:** in the installer, keep the **py launcher** ticked and tick
+✅ **"Add python.exe to PATH"**. Then **open a new terminal** (PATH changes
+don't reach already-open ones).
 
 ## 2 · Get the code
 
@@ -33,156 +31,114 @@ git clone https://github.com/Profxxxg/clearscribe.git
 cd clearscribe
 ```
 
-(Or extract the downloaded ZIP and open a terminal inside the extracted folder.)
+(No Git? **Code → Download ZIP** on GitHub, extract, open a terminal in the folder.)
 
----
-
-## 3 · Create a virtual environment (recommended)
-
-This keeps ClearScribe's dependencies separate from the rest of your system.
+## 3 · Create the virtual environment
 
 **Windows (PowerShell or CMD):**
 
 ```powershell
-python -m venv .venv
+py -3.11 -m venv .venv
 .venv\Scripts\activate
 ```
 
-> ⚠️ **Mind the space** in `venv .venv` — it's the module `venv`, a space, then
-> the folder name `.venv`. Typing `venv.venv` gives
-> `No module named venv.venv`.
-
-> If PowerShell complains about execution policy, run:
+> ⚠️ **Mind the space** in `venv .venv` — module `venv`, space, folder
+> `.venv`. Typing `venv.venv` gives `No module named venv.venv`.
+> If PowerShell blocks activation, run
 > `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`
-> then try activating again — or just use CMD instead.
+> or use CMD.
 
 **macOS / Linux:**
 
 ```bash
-python3 -m venv .venv
+python3.11 -m venv .venv
 source .venv/bin/activate
 ```
 
-Your prompt should now start with `(.venv)`. Do this activation step again
-whenever you come back in a new terminal.
+Your prompt now starts with `(.venv)`.
 
----
-
-## 4 · Install ClearScribe
-
-**With the web app (recommended for most people):**
+## 4 · Install ClearScribe with the Deep AI engine
 
 ```bash
 pip install ".[ui]"
+pip install torch torchaudio deepfilternet
 ```
 
-**CLI / library only (lighter):**
-
-```bash
-pip install .
-```
-
-This pulls in the open-source stack: `noisereduce`, `pyloudnorm`, `scipy`,
-`soundfile`, `faster-whisper` — and `gradio` if you chose `[ui]`.
-
-Verify it worked:
+The second line is ~1 GB (PyTorch) — it can look frozen for a few minutes;
+it isn't. Verify:
 
 ```bash
 clearscribe --version
 ```
 
----
-
-## 5 · Use the web app
+## 5 · Run it
 
 ```bash
 clearscribe-ui
 ```
 
-Your terminal prints a local address, usually `http://127.0.0.1:7860`.
-Open it in any browser. Then:
+Open the printed address (usually `http://127.0.0.1:7860`). Then:
 
-1. **Upload** an audio file (or click the microphone icon to record directly)
-2. Pick a **preset** — `podcast` is the recommended full chain
-3. Click **✨ Enhance**
-4. **Compare before and after** — the original and enhanced players sit side
-   by side, and a stats table shows the measured noise floor, loudness, and
-   peak levels for both
-5. (Optional) Click **📝 Transcribe enhanced audio** — pick a Whisper model
-   size and formats (TXT, SRT, VTT, JSON), then download the transcript files
+1. **Upload** any audio or video file — WAV, MP3, M4A, MP4, MKV, ... — or
+   record with the **🎙️ Record / ⏹ Stop & use** buttons (records from your
+   system microphone directly, no browser involvement)
+2. Pick the **Denoise engine**: *Deep AI* for background voices/chatter and
+   heavy noise (first use downloads its ~50 MB model, one time), *Spectral*
+   for light cleanup — it's faster
+3. Click **✨ Enhance**, then compare the **Original** and **Enhanced**
+   players side by side, with measured stats
+4. Optionally **📝 Transcribe** and download TXT/SRT/VTT/JSON
+5. Dialled-in settings? Name them and **💾 Save preset** — they persist in
+   "My saved presets" (`~/.clearscribe/presets.json`)
 
-Tweak any stage (noise reduction, gate, compressor, de-esser, EQ, loudness)
-under **Advanced settings**. To stop the app, press `Ctrl+C` in the terminal.
+> **Deep AI clipping soft word starts/endings?** Lower the **"Deep AI max
+> suppression"** slider in Advanced settings (try 30–60 dB) — gentler
+> suppression keeps quiet speech at the cost of slightly more residual noise.
 
-> **First transcription is slow — that's normal.** faster-whisper downloads
-> the model on first use (~500 MB for `small`) and caches it. Every run after
-> that starts instantly. You need an internet connection for that first run only.
+## 6 · Everyday use — no reinstalling!
 
----
-
-## 5½ · Everyday use — no reinstalling!
-
-All the `pip install` steps above are **one-time**. The packages live inside
-the `.venv` folder. From then on, using ClearScribe is just:
+Everything above is **one-time**. From then on:
 
 ```powershell
 cd path\to\clearscribe
-.venv\Scripts\activate     # (source .venv/bin/activate on macOS/Linux)
+.venv\Scripts\activate      # (source .venv/bin/activate on macOS/Linux)
 clearscribe-ui
 ```
 
-You only run pip again when updating ClearScribe itself (section 9).
+You only touch pip again to update (section 9).
 
 ---
 
-## 6 · Use the command line
+## 7 · Command line & Python library
 
 ```bash
-# Enhance + transcribe with defaults (podcast preset; txt + srt out)
-clearscribe interview.wav
+# Enhance + transcribe with the deep engine, all transcript formats
+clearscribe interview.wav --backend deep --formats txt,srt,vtt,json
 
-# Choose formats, model, and language
-clearscribe podcast.mp3 --formats txt,srt,vtt,json --model medium --language en
-
-# Only clean up the audio
-clearscribe voiceover.wav --enhance-only --preset aggressive --dehum 50
-
-# Only transcribe, skip enhancement
-clearscribe lecture.wav --no-enhance --model small
+# Presets, hum removal, saving your settings
+clearscribe voiceover.mp4 --enhance-only --preset aggressive --dehum 50 --save-preset street
+clearscribe next_take.mp4 --enhance-only --preset street
 ```
 
-Results land in `clearscribe_output/` (change with `-o mydir`).
-Run `clearscribe --help` for every option.
-
----
-
-## 7 · Use it as a Python library
+`clearscribe --help` lists everything. As a library:
 
 ```python
 from clearscribe.pipeline import run_pipeline
 from clearscribe.enhance import PRESETS
 
-outputs = run_pipeline(
-    "interview.wav", "out/",
-    formats=["srt", "json"],
-    enhance_settings=PRESETS["podcast"],
-)
-print(outputs["srt"].read_text(encoding="utf-8"))
+outputs = run_pipeline("interview.wav", "out/", formats=["srt", "json"],
+                       enhance_settings=PRESETS["podcast"])
 ```
 
----
-
-## 8 · Run the tests (for contributors)
+## 8 · Run the tests (contributors)
 
 ```bash
 pip install ".[dev]"
 pytest -v
 ```
 
-All 28 tests run fully offline — transcription is mocked and the DSP stages
-are verified against synthetic audio with measurable assertions.
-
----
+The suite runs fully offline — Whisper and DeepFilterNet are mocked, DSP
+stages are verified against synthetic audio with measurable assertions.
 
 ## 9 · Updating
 
@@ -194,55 +150,22 @@ pip install ".[ui]" --upgrade
 
 ---
 
-## Optional: the Deep AI denoise engine
+## Alternative: lite install (no Deep AI)
 
-If your recordings have **background voices/chatter** or heavy noise the
-built-in denoiser can't handle, install the DeepFilterNet backend.
-
-> ⚠️ **Requires Python 3.8–3.11.** DeepFilterNet's compiled component has no
-> prebuilt wheels for Python 3.12+ yet — on 3.12 pip tries to compile it and
-> fails with *"Cargo, the Rust package manager, is not installed"*.
-
-**If your Python is 3.8–3.11**, it's just:
+Works on any Python **3.10+**, no PyTorch download; you get the full
+spectral chain (denoise, auto-notch, gate, compressor, de-esser, EQ,
+loudness) and transcription — but not the neural engine that handles
+background voices:
 
 ```bash
-pip install torch torchaudio deepfilternet
+python -m venv .venv
+.venv\Scripts\activate          # or: source .venv/bin/activate
+pip install ".[ui]"
+clearscribe-ui
 ```
 
-**If your Python is 3.12 or newer**, run ClearScribe in a Python 3.11
-environment instead (both Pythons coexist happily):
-
-1. Install Python 3.11. **Use 3.11.9** — it's the last 3.11 with a Windows
-   installer (newer 3.11.x are source-only security releases):
-   [direct installer download](https://www.python.org/ftp/python/3.11.9/python-3.11.9-amd64.exe)
-   · [release page](https://www.python.org/downloads/release/python-3119/)
-2. In the `clearscribe` folder, create and activate a 3.11 venv:
-
-   **Windows:**
-   ```powershell
-   py -3.11 -m venv .venv311
-   .venv311\Scripts\activate
-   ```
-   **macOS / Linux:**
-   ```bash
-   python3.11 -m venv .venv311
-   source .venv311/bin/activate
-   ```
-3. Install everything in it:
-   ```bash
-   pip install ".[ui]"
-   pip install torch torchaudio deepfilternet
-   ```
-
-(Alternative for those who want to stay on 3.12: install
-[Rust](https://rustup.rs/) and, on Windows, the Microsoft C++ Build Tools,
-then `pip install deepfilternet` compiles from source.)
-
-Then choose **Deep AI — DeepFilterNet** in the web app's "Denoise engine"
-selector, or add `--backend deep` on the command line. The model (~50 MB)
-downloads automatically on first use. Note: PyTorch is a large download
-(1 GB+), and processing is slower than the built-in engine — but the quality
-difference on background voices is night and day.
+You can add the Deep AI engine later by redoing steps 1, 3, 4 with
+Python 3.11.
 
 ---
 
@@ -250,22 +173,22 @@ difference on background voices is night and day.
 
 | Problem | Fix |
 |---|---|
-| `python` / `pip` is not recognized (Windows) | Reinstall Python with **"Add Python to PATH"** ticked, or use `py -m pip ...` |
-| `clearscribe: command not found` | Your venv isn't activated — redo step 3's activate command |
+| `python` / `pip` / `py` is not recognized (Windows) | Install Python from [python.org](https://www.python.org/downloads/) with **"Add python.exe to PATH"** ticked (the `py` launcher is included — Microsoft Store Pythons don't have it), then **open a new terminal**. Or call the interpreter directly: `"%LOCALAPPDATA%\Programs\Python\Python311\python.exe" -m venv .venv` |
+| `No module named venv.venv` | Missing space: it's `python -m venv .venv` |
+| `clearscribe: command not found` | The venv isn't activated — redo the activate command from step 3 |
 | PowerShell won't activate the venv | `Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser`, or use CMD |
-| Mic recording shows **0:00** and the page hangs | Use the **🎙️ Record (system mic)** button instead (v0.5.0+) — it records in Python, completely bypassing the browser's recorder, which is what fails here. The browser-recorder checklist is below if you want to fix that too |
-| Browser recorder specifically (the small mic widget) | The browser's recorder produced no audio — this fails **in the browser**, before ClearScribe receives anything. In order: ① check the site's microphone permission (padlock icon in the address bar); ② check Windows Settings → Privacy → Microphone allows desktop apps/browsers; ③ try Chrome or Edge — Brave and strict-privacy browsers often block the recording APIs; ④ update Gradio: `pip install -U gradio`; ⑤ reliable fallback: record with your system voice recorder (Windows Sound Recorder saves .m4a) and upload the file — ClearScribe accepts it directly |
-| First transcription hangs at the start | It's downloading the Whisper model (one-time, ~500 MB for `small`) — watch the terminal for progress |
-| Transcription is slow | Use a smaller model: `--model base` or `--model tiny`; larger = more accurate but slower on CPU |
-| Wrong language detected | Set it explicitly: `--language en` (or type it in the UI's language box) |
-| Port 7860 already in use | Another Gradio app is running — close it, or `GRADIO_SERVER_PORT=7861 clearscribe-ui` |
-| Enhanced audio sounds over-processed | Try the `gentle` preset, or lower the noise-reduction and compressor sliders |
-| Background voices still audible | Spectral denoising can't separate voice from voice — install the Deep AI engine (section above) and select it |
-| `Cargo, the Rust package manager, is not installed` when installing deepfilternet | You're on Python 3.12+ where no prebuilt wheels exist — use a Python 3.11 venv as shown in the Deep AI section above |
-| `No module named 'torchaudio'` when using Deep AI | Install it in the same venv: `pip install torchaudio` (if versions clash: `pip install torch torchaudio --upgrade`) |
-| `No module named 'torchaudio.backend'` when using Deep AI | Your ClearScribe predates the built-in compatibility shim — update ClearScribe (`git pull` + `pip install .` ), or pin the older pair: `pip install torch==2.5.1 torchaudio==2.5.1` |
-| `'py' is not recognized` (Windows) | The `py` launcher is missing — common if your Python came from the Microsoft Store. Install Python from [python.org](https://www.python.org/downloads/) (the launcher is included), **open a new terminal**, and retry. Or call the interpreter directly: `"%LOCALAPPDATA%\Programs\Python\Python311\python.exe" -m venv .venv311` |
-| A constant whine/beep survives (often 1–8 kHz) | Make sure **Auto-remove tonal noises** is ticked (it's on by default); also try setting the Presence EQ slider to 0 so leftover noise there isn't boosted |
+| `Cargo, the Rust package manager, is not installed` installing deepfilternet | You're on Python 3.12+ (no prebuilt wheels) — use the Python 3.11 setup above |
+| `No module named 'torchaudio'` using Deep AI | `pip install torchaudio` in the venv (version clash: `pip install torch torchaudio --upgrade`) |
+| `No module named 'torchaudio.backend'` using Deep AI | Update ClearScribe (`git pull` + `pip install .`) — it ships a compatibility shim. Or pin: `pip install torch==2.5.1 torchaudio==2.5.1` |
+| 🎙️ Record says "could not open the microphone" | Check a mic is connected and Windows Settings → Privacy & security → Microphone allows desktop apps; close other apps using the mic exclusively |
+| First transcription / first Deep AI run hangs at the start | One-time model download (~500 MB Whisper `small`; ~50 MB DeepFilterNet) — watch the terminal |
+| Deep AI cuts the start/end of sentences | Lower **"Deep AI max suppression"** in Advanced settings to 30–60 dB |
+| Transcription slow | Smaller model: `--model base` or `tiny` |
+| Wrong language detected | Set it: `--language en`, or type it in the UI |
+| Port 7860 already in use | Close the other Gradio app, or `GRADIO_SERVER_PORT=7861 clearscribe-ui` |
+| Sounds over-processed | `gentle` preset, or lower noise reduction / compressor |
+| Background voices still audible on Spectral | That's expected — spectral filtering can't separate voice from voice. Use the Deep AI engine |
+| A constant whine/beep survives (1–8 kHz) | Keep **Auto-remove tonal noises** ticked; set the Presence EQ slider to 0 so leftover noise there isn't boosted |
 
-Still stuck? [Open an issue](https://github.com/Profxxxg/clearscribe/issues) —
-include your OS, Python version, and the full error message.
+Still stuck? [Open an issue](https://github.com/Profxxxg/clearscribe/issues)
+with your OS, Python version, and the full error message.

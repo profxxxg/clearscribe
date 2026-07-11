@@ -105,8 +105,20 @@ def is_available() -> bool:
         return False
 
 
-def deep_denoise(audio: np.ndarray, sr: int) -> np.ndarray:
-    """Denoise with DeepFilterNet3. Handles resampling to/from its 48 kHz."""
+def deep_denoise(
+    audio: np.ndarray, sr: int, atten_lim_db: float = 100.0
+) -> np.ndarray:
+    """Denoise with DeepFilterNet3. Handles resampling to/from its 48 kHz.
+
+    Two protections against the model clipping soft speech at boundaries:
+    - the signal is reflect-padded by 0.5 s on both ends so the model's
+      noise estimate has warmed up before the real audio starts, then the
+      padding is trimmed off;
+    - `atten_lim_db` caps the maximum suppression (DeepFilterNet's own
+      parameter): 100 = unlimited; lower values mix the result toward the
+      original, keeping soft word onsets/endings at the cost of a slightly
+      higher noise floor.
+    """
     try:
         _ensure_torchaudio_compat()
         import torch
@@ -128,9 +140,21 @@ def deep_denoise(audio: np.ndarray, sr: int) -> np.ndarray:
         g = gcd(sr, target_sr)
         x = resample_poly(x, target_sr // g, sr // g).astype(np.float32)
 
+    pad = min(int(0.5 * target_sr), max(len(x) - 1, 0))
+    if pad > 0:  # reflect-pad: realistic warm-up material for the model
+        x_padded = np.concatenate([x[:pad][::-1], x, x[-pad:][::-1]])
+    else:
+        x_padded = x
+
+    lim = None if atten_lim_db is None or atten_lim_db >= 100 else float(atten_lim_db)
+    tensor = torch.from_numpy(x_padded).unsqueeze(0)
     with torch.no_grad():
-        out = enhance(model, df_state, torch.from_numpy(x).unsqueeze(0))
+        try:
+            out = enhance(model, df_state, tensor, atten_lim_db=lim)
+        except TypeError:  # very old df versions lack the kwarg
+            out = enhance(model, df_state, tensor)
     y = out.squeeze(0).cpu().numpy()
+    y = y[pad: pad + len(x)]
 
     if sr != target_sr:
         g = gcd(sr, target_sr)

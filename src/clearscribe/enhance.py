@@ -41,6 +41,9 @@ class EnhanceSettings:
     dehum_hz: float = 0.0            # 0 = off; set 50 (EU) or 60 (US)
     auto_notch: bool = True          # auto-remove tonal whines/beeps
     backend: str = "spectral"        # "spectral" (built-in) or "deep" (DeepFilterNet)
+    deep_atten_lim_db: float = 100.0  # max suppression for the deep engine;
+                                      # 100 = unlimited, lower = gentler (keeps
+                                      # soft word onsets/endings)
     noise_reduction_strength: float = 0.85
     stationary_noise: bool = False
     two_pass_noise_reduction: bool = True  # stationary pass then adaptive pass
@@ -141,12 +144,14 @@ def normalize_loudness(
     loudness = meter.integrated_loudness(audio.astype(np.float64))
     if not np.isfinite(loudness):
         return audio
-    normalized = pyln.normalize.loudness(audio.astype(np.float64), loudness, target_lufs)
+    normalized = pyln.normalize.loudness(
+        audio.astype(np.float64), loudness, target_lufs).astype(np.float32)
 
-    peak = np.max(np.abs(normalized))
-    if peak > peak_ceiling:
-        normalized = normalized / peak * peak_ceiling
-    return normalized.astype(np.float32)
+    # A few peaks shouldn't stop the whole file reaching the loudness
+    # target — limit them instead of scaling everything back down.
+    if np.max(np.abs(normalized)) > peak_ceiling:
+        normalized = dsp.limiter(normalized, sr, ceiling=peak_ceiling)
+    return normalized
 
 
 def enhance_array(
@@ -171,8 +176,9 @@ def enhance_array(
 
     if s.backend == "deep":
         from clearscribe.deep import deep_denoise
-        logger.info("Deep denoise (DeepFilterNet)")
-        audio = deep_denoise(audio, sr)
+        logger.info("Deep denoise (DeepFilterNet, max suppression %.0f dB)",
+                    s.deep_atten_lim_db)
+        audio = deep_denoise(audio, sr, atten_lim_db=s.deep_atten_lim_db)
     else:
         logger.info("Noise reduction (strength=%.2f, two_pass=%s)",
                     s.noise_reduction_strength, s.two_pass_noise_reduction)
@@ -180,8 +186,13 @@ def enhance_array(
                              s.stationary_noise, s.two_pass_noise_reduction)
 
     if s.gate_ratio > 1.0:
-        logger.info("Noise gate at %.0f dB", s.gate_threshold_db)
-        audio = dsp.gate(audio, sr, s.gate_threshold_db, s.gate_ratio)
+        if s.backend == "deep":
+            logger.info("Noise gate skipped — the deep engine already "
+                        "silences pauses, and gating after it clips soft "
+                        "word onsets")
+        else:
+            logger.info("Noise gate at %.0f dB", s.gate_threshold_db)
+            audio = dsp.gate(audio, sr, s.gate_threshold_db, s.gate_ratio)
 
     if s.comp_ratio > 1.0:
         logger.info("Compressor %.1f:1 at %.0f dB", s.comp_ratio, s.comp_threshold_db)

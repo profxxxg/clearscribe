@@ -61,7 +61,7 @@ def test_deep_backend_is_dispatched(noisy_wav, tmp_path):
     from clearscribe.enhance import EnhanceSettings
 
     with patch("clearscribe.deep.deep_denoise",
-               side_effect=lambda a, sr: np.zeros_like(a)) as mock_deep:
+               side_effect=lambda a, sr, atten_lim_db=100.0: np.zeros_like(a)) as mock_deep:
         run_pipeline(noisy_wav, tmp_path / "out", transcribe=False,
                      enhance_settings=EnhanceSettings(backend="deep"))
     mock_deep.assert_called_once()
@@ -100,3 +100,56 @@ def test_torchaudio_compat_shim(monkeypatch):
     from torchaudio.backend.common import AudioMetaData  # must not raise
     assert AudioMetaData is not None
     assert sys.modules["torchaudio"].backend.common.AudioMetaData is AudioMetaData
+
+
+def test_deep_denoise_padding_and_atten(monkeypatch):
+    """deep_denoise must pass atten limit through and return exact length."""
+    import sys
+    import types
+
+    import numpy as np
+
+    calls = {}
+
+    class FakeTensor:
+        def __init__(self, arr): self.arr = np.asarray(arr)
+        def unsqueeze(self, _): return self
+        def squeeze(self, _): return self
+        def cpu(self): return self
+        def numpy(self): return self.arr
+
+    fake_torch = types.ModuleType("torch")
+    fake_torch.from_numpy = lambda a: FakeTensor(a)
+    class _NoGrad:
+        def __enter__(self): return None
+        def __exit__(self, *a): return False
+    fake_torch.no_grad = _NoGrad
+
+    fake_df = types.ModuleType("df")
+    fake_enh = types.ModuleType("df.enhance")
+    class FakeState:
+        def sr(self): return 16000
+    def fake_init_df(): return "model", FakeState(), None
+    def fake_enhance(model, state, tensor, atten_lim_db=None):
+        calls["atten"] = atten_lim_db
+        calls["in_len"] = len(tensor.arr)
+        return tensor  # identity
+    fake_enh.init_df, fake_enh.enhance = fake_init_df, fake_enhance
+    fake_df.enhance = fake_enh
+    monkeypatch.setitem(sys.modules, "torch", fake_torch)
+    monkeypatch.setitem(sys.modules, "df", fake_df)
+    monkeypatch.setitem(sys.modules, "df.enhance", fake_enh)
+
+    import clearscribe.deep as deep
+    monkeypatch.setattr(deep, "_MODEL_CACHE", {})
+
+    audio = np.random.default_rng(0).normal(0, 0.1, 16000).astype(np.float32)
+    out = deep.deep_denoise(audio, 16000, atten_lim_db=40.0)
+    assert len(out) == len(audio)             # padding fully trimmed
+    assert calls["atten"] == 40.0             # limit passed to the model
+    assert calls["in_len"] == len(audio) + 2 * 8000  # 0.5 s reflect each side
+    assert np.allclose(out, audio, atol=1e-6)  # identity model -> identity out
+
+    out2 = deep.deep_denoise(audio, 16000, atten_lim_db=100.0)
+    assert calls["atten"] is None             # 100 means unlimited
+    assert len(out2) == len(audio)

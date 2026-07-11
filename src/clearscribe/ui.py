@@ -30,7 +30,7 @@ except ImportError as e:  # pragma: no cover
 def _settings_from_ui(
     preset, backend_choice, auto_notch, strength, stationary, dehum_choice,
     gate_thresh, comp_ratio, comp_thresh, deess_ratio, warmth, presence, air,
-    target_lufs,
+    target_lufs, deep_limit=100.0,
 ) -> EnhanceSettings:
     base = PRESETS.get(preset, PRESETS["podcast"])
     return EnhanceSettings(
@@ -38,6 +38,7 @@ def _settings_from_ui(
         dehum_hz={"Off": 0.0, "50 Hz (EU/most of world)": 50.0,
                   "60 Hz (Americas)": 60.0}[dehum_choice],
         backend="deep" if backend_choice.startswith("Deep") else "spectral",
+        deep_atten_lim_db=deep_limit,
         auto_notch=auto_notch,
         noise_reduction_strength=strength,
         stationary_noise=stationary,
@@ -67,7 +68,7 @@ def _settings_to_knobs(s: EnhanceSettings):
     return (backend, s.auto_notch, s.noise_reduction_strength,
             s.stationary_noise, dehum, s.gate_threshold_db, s.comp_ratio,
             s.comp_threshold_db, s.deess_ratio, s.warmth_db, s.presence_db,
-            s.air_db, s.target_lufs)
+            s.air_db, s.target_lufs, s.deep_atten_lim_db)
 
 
 def _apply_preset(preset: str):
@@ -179,14 +180,13 @@ def build_app() -> "gr.Blocks":
                     type="filepath")
                 original_audio = gr.Audio(label="Original — listen",
                                           type="filepath", interactive=False)
-                mic_audio = gr.Audio(label="... or record", type="filepath",
-                                     sources=["microphone"], format="wav")
-                gr.Markdown("Browser recorder not working (0:00 / freeze)? "
-                            "Use the **system mic** instead:")
+                gr.Markdown("**… or record from your microphone:**")
                 with gr.Row():
-                    rec_start_btn = gr.Button("🎙️ Record (system mic)")
-                    rec_stop_btn = gr.Button("⏹ Stop & use recording")
+                    rec_start_btn = gr.Button("🎙️ Record", variant="primary")
+                    rec_stop_btn = gr.Button("⏹ Stop & use", variant="stop")
                 rec_status = gr.Markdown("")
+                mic_audio = gr.Audio(label="Recording — listen",
+                                     type="filepath", interactive=False)
             with gr.Column():
                 gr.Markdown("### 2 · Enhanced — compare side by side")
                 output_audio = gr.Audio(label="Enhanced result", type="filepath",
@@ -269,6 +269,14 @@ def build_app() -> "gr.Blocks":
                     -24, -12, -16, step=1, label="Loudness target (LUFS)",
                     info="Final overall loudness. −16 is the podcast standard; "
                          "−14 for louder platforms like Spotify")
+            with gr.Row():
+                deep_limit = gr.Slider(
+                    6, 100, 100, step=2,
+                    label="Deep AI max suppression (dB)",
+                    info="Only affects the Deep AI engine. 100 = full "
+                         "strength; lower it (try 30–60) if word starts or "
+                         "endings get clipped — gentler suppression keeps "
+                         "soft speech at the cost of a bit more noise")
 
         enhance_btn = gr.Button("✨ Enhance", variant="primary")
         stats_md = gr.Markdown()
@@ -347,7 +355,8 @@ def build_app() -> "gr.Blocks":
 
         all_knobs = [backend_choice, auto_notch, strength, stationary,
                      dehum_choice, gate_thresh, comp_ratio, comp_thresh,
-                     deess_ratio, warmth, presence, air, target_lufs]
+                     deess_ratio, warmth, presence, air, target_lufs,
+                     deep_limit]
 
         def _save_preset(name, preset_val, *knob_vals):
             settings = _settings_from_ui(preset_val, *knob_vals)

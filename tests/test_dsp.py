@@ -96,3 +96,12 @@ def test_remove_tonal_noises_crushes_whine_keeps_voice():
     assert peak(3500) < 0.05 * peak(200)          # whine crushed
     ref = np.abs(np.fft.rfft((voice)[2*SR:]))
     assert peak(200) > 0.9 * ref[np.abs(fq-200) < 3].max()  # voice intact
+
+
+def test_limiter_catches_peaks_transparent_below():
+    quiet = tone(300, 1.0, 0.3)
+    hot = tone(300, 1.0, 1.6)
+    out_q = dsp.limiter(quiet, SR, ceiling=0.95)
+    out_h = dsp.limiter(hot, SR, ceiling=0.95)
+    assert np.abs(out_h).max() <= 0.95 + 1e-4
+    assert np.allclose(out_q[SR//4:], quiet[SR//4:], atol=0.02)  # untouched

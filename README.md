@@ -12,7 +12,7 @@ Classic spectral denoising **cannot** separate one voice from other voices — b
 pip install torch torchaudio deepfilternet
 ```
 
-**Heads-up: requires Python 3.8–3.11.** On Python 3.12+ there are no prebuilt wheels yet, so pip will demand the Rust toolchain — the easy fix is running ClearScribe in a Python 3.11 virtual environment ([step-by-step in INSTALL.md](INSTALL.md#optional-the-deep-ai-denoise-engine)).
+**The recommended install in [INSTALL.md](INSTALL.md) sets this up by default** (it uses Python 3.11, which the deep engine's prebuilt wheels require — on 3.12+ pip would demand the Rust toolchain).
 
 Then pick **Deep AI** in the web app, or use `--backend deep` on the CLI. The model (~50 MB) downloads once and is cached.
 

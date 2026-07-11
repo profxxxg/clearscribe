@@ -204,6 +204,22 @@ def dehum(
     return out.astype(np.float32)
 
 
+def limiter(
+    audio: np.ndarray,
+    sr: int,
+    ceiling: float = 0.98,
+    release_ms: float = 60.0,
+) -> np.ndarray:
+    """Fast peak limiter: transparent on normal material, catches overs.
+
+    Lets loudness normalisation actually reach its target instead of
+    backing the whole file off because of a few peaks.
+    """
+    env = envelope(audio, sr, attack_ms=0.5, release_ms=release_ms, hop=16)
+    gain = np.minimum(1.0, ceiling / np.maximum(env, 1e-9))
+    return np.clip(audio * gain, -ceiling, ceiling).astype(np.float32)
+
+
 # ---------------------------------------------------------- tonal noise
 
 def find_tonal_noises(

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "clearscribe"
-version = "0.5.0"
+version = "0.6.0"
 description = "AI voice enhancer + transcript writer. Clean up noisy recordings and generate TXT/SRT/VTT/JSON transcripts — fully open source, runs locally."
 readme = "README.md"
 license = { text = "MIT" }

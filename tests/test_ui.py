@@ -21,7 +21,7 @@ def test_apply_preset_returns_all_knobs():
 def test_settings_from_ui_maps_dehum_choice():
     s = _settings_from_ui("podcast", "Spectral (built-in)", True,
                           0.85, False, "50 Hz (EU/most of world)",
-                          -45, 3.0, -22, 4.0, 1.5, 2.5, 1.5, -16)
+                          -45, 3.0, -22, 4.0, 1.5, 2.5, 1.5, -16, 100)
     assert s.dehum_hz == 50.0
     assert s.comp_ratio == 3.0
     assert s.backend == "spectral" and s.auto_notch
@@ -30,8 +30,9 @@ def test_settings_from_ui_maps_dehum_choice():
 def test_settings_from_ui_deep_backend():
     s = _settings_from_ui("podcast", "Deep AI — DeepFilterNet", False,
                           0.85, False, "Off",
-                          -45, 3.0, -22, 4.0, 1.5, 2.5, 1.5, -16)
+                          -45, 3.0, -22, 4.0, 1.5, 2.5, 1.5, -16, 42)
     assert s.backend == "deep" and not s.auto_notch
+    assert s.deep_atten_lim_db == 42
 
 
 def test_enhance_for_ui_end_to_end(noisy_wav):
@@ -61,6 +62,7 @@ def test_settings_to_knobs_roundtrip():
     s = EnhanceSettings(backend="deep", dehum_hz=60.0, comp_ratio=5.0,
                         auto_notch=False, target_lufs=-18.0)
     knobs = _settings_to_knobs(s)
+    assert len(knobs) == 14
     rebuilt = _settings_from_ui("podcast", *knobs)
     assert rebuilt.backend == "deep" and rebuilt.dehum_hz == 60.0
     assert rebuilt.comp_ratio == 5.0 and rebuilt.target_lufs == -18.0

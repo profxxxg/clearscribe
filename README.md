@@ -1,3 +1,13 @@
+<p align="center">
+  <img src="assets/banner.png" alt="ClearScribe — AI voice enhancer + transcript writer" width="100%">
+</p>
+
+<p align="center">
+  <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-orange.svg">
+  <img alt="Runs locally" src="https://img.shields.io/badge/runs-100%25%20local-orange.svg">
+  <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-orange.svg">
+</p>
+
 # ClearScribe 🎙️✨
 
 **AI voice enhancer + transcript writer — fully open source, runs 100% locally.**
